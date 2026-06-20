@@ -48,6 +48,10 @@ class VerificationConfig(BaseModel):
     backend_mode: str = "none"
 
 
+class DedupConfig(BaseModel):
+    similarity_threshold: float = Field(default=0.72, ge=0.0, le=1.0)
+
+
 class LoggingConfig(BaseModel):
     level: str = "INFO"
 
@@ -60,6 +64,7 @@ class AppConfig(BaseModel):
     embedding: EmbeddingConfig = Field(default_factory=EmbeddingConfig)
     defaults: DefaultsConfig = Field(default_factory=DefaultsConfig)
     verification: VerificationConfig = Field(default_factory=VerificationConfig)
+    dedup: DedupConfig = Field(default_factory=DedupConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
 
 

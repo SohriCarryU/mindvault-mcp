@@ -28,7 +28,7 @@ def build_runtime(config: AppConfig) -> ToolRuntime:
         auth=AuthService(config),
         repository=repository,
         extractor=RuleBasedExtractor(config),
-        dedup=DuplicateDetector(),
+        dedup=DuplicateDetector(config, repository),
         embeddings=EmbeddingService(config),
         verification=VerificationService(config),
     )

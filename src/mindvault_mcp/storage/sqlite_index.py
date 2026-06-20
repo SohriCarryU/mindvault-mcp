@@ -36,6 +36,7 @@ class SQLiteIndex:
                     verification_status TEXT NOT NULL,
                     domain TEXT NOT NULL,
                     tags_json TEXT NOT NULL,
+                    confidence REAL NOT NULL DEFAULT 0,
                     privacy_level INTEGER NOT NULL,
                     source_agent TEXT NOT NULL,
                     searchable_text TEXT NOT NULL,
@@ -43,6 +44,7 @@ class SQLiteIndex:
                 )
                 """
             )
+            self._ensure_column(conn, "cards", "confidence", "REAL NOT NULL DEFAULT 0")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_cards_library ON cards(library)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_cards_status ON cards(status)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_cards_verification ON cards(verification_status)")
@@ -70,9 +72,9 @@ class SQLiteIndex:
                 """
                 INSERT INTO cards (
                     card_id, title, library, status, verification_status, domain,
-                    tags_json, privacy_level, source_agent, searchable_text, updated_at
+                    tags_json, confidence, privacy_level, source_agent, searchable_text, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(card_id) DO UPDATE SET
                     title=excluded.title,
                     library=excluded.library,
@@ -80,6 +82,7 @@ class SQLiteIndex:
                     verification_status=excluded.verification_status,
                     domain=excluded.domain,
                     tags_json=excluded.tags_json,
+                    confidence=excluded.confidence,
                     privacy_level=excluded.privacy_level,
                     source_agent=excluded.source_agent,
                     searchable_text=excluded.searchable_text,
@@ -93,6 +96,7 @@ class SQLiteIndex:
                     str(card.verification_status),
                     card.domain,
                     json.dumps(card.tags),
+                    card.confidence,
                     card.privacy_level,
                     card.source_agent,
                     card.searchable_text(),
@@ -149,13 +153,20 @@ class SQLiteIndex:
             {where}
             ORDER BY
                 CASE library WHEN 'primary' THEN 0 ELSE 1 END,
-                updated_at DESC
+                confidence DESC,
+                updated_at DESC,
+                card_id ASC
             LIMIT ? OFFSET ?
         """
         params.extend([limit, offset])
         with self.connect() as conn:
             rows = conn.execute(sql, params).fetchall()
         return [(row["card_id"], Library(row["library"])) for row in rows]
+
+    def _ensure_column(self, conn: sqlite3.Connection, table: str, column: str, definition: str) -> None:
+        columns = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+        if column not in columns:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
 
     def enqueue_verification(self, item: VerificationQueueItem) -> None:
         with self.connect() as conn:

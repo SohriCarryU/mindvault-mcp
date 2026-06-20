@@ -32,5 +32,8 @@ defaults:
 verification:
   backend_mode: "none"
 
+dedup:
+  similarity_threshold: 0.72
+
 logging:
   level: "INFO"
