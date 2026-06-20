@@ -65,9 +65,24 @@ def create_app(config_path: str | None = None) -> Any:
         return response.model_dump(mode="json")
 
     @mcp.tool()
-    def list_candidates(token: str, domain: str | None = None, limit: int = 20, offset: int = 0) -> dict:
+    def list_candidates(
+        token: str,
+        domain: str | None = None,
+        tags: list[str] | None = None,
+        min_confidence: float | None = None,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> dict:
         """List staging candidate cards."""
-        response = list_candidates_impl(runtime, token, domain=domain, limit=limit, offset=offset)
+        response = list_candidates_impl(
+            runtime,
+            token,
+            domain=domain,
+            tags=tags,
+            min_confidence=min_confidence,
+            limit=limit,
+            offset=offset,
+        )
         return response.model_dump(mode="json")
 
     @mcp.tool()
