@@ -160,6 +160,14 @@ http://127.0.0.1:8000/sse
 
 Every tool call must include a configured `token`. The token maps to an agent identity with `trust_level` and `allowed_libraries`.
 
+For a real local SSE smoke check, start `mindvault-mcp` in one terminal and run:
+
+```powershell
+python docs/sse-smoke-client.py --url http://127.0.0.1:8000/sse --token dev-trusted-token
+```
+
+Hermes/OpenClaw-style config examples are in [docs/hermes-openclaw-config.md](docs/hermes-openclaw-config.md).
+
 ## Data Layout
 
 Markdown is the durable source of truth for cards:

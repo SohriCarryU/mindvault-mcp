@@ -111,6 +111,14 @@ http://127.0.0.1:8000/sse
 
 Tool calls must include a configured token.
 
+To manually verify a running local SSE endpoint:
+
+```powershell
+python docs/sse-smoke-client.py --url http://127.0.0.1:8000/sse --token dev-trusted-token
+```
+
+See [Hermes / OpenClaw MCP Client Configuration](hermes-openclaw-config.md) for client-style examples.
+
 ## Not Implemented
 
 The following are intentionally not implemented in this release:
