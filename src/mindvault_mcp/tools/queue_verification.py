@@ -14,16 +14,16 @@ class QueueVerificationResponse(BaseModel):
     queue_item: VerificationQueueItem | None = None
 
 
-def queue_verification(runtime: ToolRuntime, token: str, card_id: str) -> QueueVerificationResponse:
+def queue_verification(runtime: ToolRuntime, token: str, card_id: str, reason: str = "") -> QueueVerificationResponse:
     ctx = runtime.auth.authenticate(token)
     card = runtime.repository.get(card_id)
     runtime.auth.require_write_library(ctx, card.library)
     runtime.auth.require_read_card(ctx, card)
-    updated = runtime.repository.queue_verification(card_id)
-    item = runtime.verification.queue(card_id=card_id, queued_by=ctx.agent.agent_id)
+    item = runtime.verification.queue(card_id=card_id, queued_by=ctx.agent.agent_id, reason=reason)
+    updated = runtime.repository.queue_verification(card_id, item=item)
     return QueueVerificationResponse(
         ok=True,
-        message="Verification queued as a phase 1 placeholder; no external verification was run.",
+        message="Verification queued as a phase 2 placeholder; no external verification was run.",
         card=updated,
         queue_item=item,
     )

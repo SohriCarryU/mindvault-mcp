@@ -110,9 +110,9 @@ def create_app(config_path: str | None = None) -> Any:
         return response.model_dump(mode="json")
 
     @mcp.tool()
-    def queue_verification(token: str, card_id: str) -> dict:
+    def queue_verification(token: str, card_id: str, reason: str = "") -> dict:
         """Mark a card as pending verification without calling external services."""
-        response = queue_verification_impl(runtime, token, card_id)
+        response = queue_verification_impl(runtime, token, card_id, reason=reason)
         return response.model_dump(mode="json")
 
     return mcp

@@ -76,4 +76,6 @@ class VerificationQueueItem(BaseModel):
     queued_by: str
     queued_at: datetime = Field(default_factory=utc_now)
     backend_mode: str = "none"
-    note: str = "Verification backend is not implemented in phase 1."
+    reason: str = ""
+    status: str = "pending"
+    note: str = "Verification backend is not implemented in phase 2."

@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Iterable
 
 from mindvault_mcp.enums import Library
-from mindvault_mcp.models import Card
+from mindvault_mcp.models import Card, VerificationQueueItem
 
 
 class SQLiteIndex:
@@ -47,6 +47,22 @@ class SQLiteIndex:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_cards_status ON cards(status)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_cards_verification ON cards(verification_status)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_cards_domain ON cards(domain)")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS verification_queue (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    card_id TEXT NOT NULL,
+                    queued_by TEXT NOT NULL,
+                    queued_at TEXT NOT NULL,
+                    backend_mode TEXT NOT NULL,
+                    reason TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    note TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_verification_queue_status ON verification_queue(status)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_verification_queue_card ON verification_queue(card_id)")
 
     def upsert_card(self, card: Card) -> None:
         with self.connect() as conn:
@@ -140,3 +156,47 @@ class SQLiteIndex:
         with self.connect() as conn:
             rows = conn.execute(sql, params).fetchall()
         return [(row["card_id"], Library(row["library"])) for row in rows]
+
+    def enqueue_verification(self, item: VerificationQueueItem) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO verification_queue (
+                    card_id, queued_by, queued_at, backend_mode, reason, status, note
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    item.card_id,
+                    item.queued_by,
+                    item.queued_at.isoformat(),
+                    item.backend_mode,
+                    item.reason,
+                    item.status,
+                    item.note,
+                ),
+            )
+
+    def list_verification_queue(self, status: str = "pending") -> list[VerificationQueueItem]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT card_id, queued_by, queued_at, backend_mode, reason, status, note
+                FROM verification_queue
+                WHERE status = ?
+                ORDER BY queued_at ASC, id ASC
+                """,
+                (status,),
+            ).fetchall()
+        return [
+            VerificationQueueItem(
+                card_id=row["card_id"],
+                queued_by=row["queued_by"],
+                queued_at=row["queued_at"],
+                backend_mode=row["backend_mode"],
+                reason=row["reason"],
+                status=row["status"],
+                note=row["note"],
+            )
+            for row in rows
+        ]

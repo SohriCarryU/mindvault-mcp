@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from mindvault_mcp.enums import CardStatus, Library, VerificationStatus
-from mindvault_mcp.models import Card
+from mindvault_mcp.models import Card, VerificationQueueItem, utc_now
 
 from .markdown_store import MarkdownStore
 from .sqlite_index import SQLiteIndex
@@ -23,7 +23,8 @@ class CardRepository:
         if location is None:
             raise KeyError(f"Card not found: {card_id}")
         _, library = location
-        return self.markdown_store.read_card(library, card_id)
+        card = self.markdown_store.read_card(library, card_id)
+        return self._apply_expiration(card)
 
     def search(
         self,
@@ -75,7 +76,24 @@ class CardRepository:
                 setattr(card, key, value)
         return self.save(Card.model_validate(card.model_dump()))
 
-    def queue_verification(self, card_id: str) -> Card:
+    def queue_verification(self, card_id: str, item: VerificationQueueItem | None = None) -> Card:
         card = self.get(card_id)
         card.verification_status = VerificationStatus.PENDING_VERIFICATION
-        return self.save(card)
+        updated = self.save(card)
+        if item is not None:
+            self.sqlite_index.enqueue_verification(item)
+        return updated
+
+    def list_pending_verifications(self) -> list[VerificationQueueItem]:
+        return self.sqlite_index.list_verification_queue(status="pending")
+
+    def _apply_expiration(self, card: Card) -> Card:
+        if (
+            card.valid_until is not None
+            and card.valid_until < utc_now()
+            and card.verification_status != VerificationStatus.NO_VERIFICATION_NEEDED
+            and card.verification_status != VerificationStatus.EXPIRED
+        ):
+            card.verification_status = VerificationStatus.EXPIRED
+            self.save(card)
+        return card
