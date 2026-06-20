@@ -1,0 +1,36 @@
+server:
+  host: "127.0.0.1"
+  port: 8000
+  transport: "sse"
+
+storage:
+  primary_path: "data/primary"
+  staging_path: "data/staging"
+  sqlite_path: "data/mindvault.sqlite"
+
+auth:
+  agents:
+    - token: "dev-admin-token"
+      agent_id: "admin-agent"
+      trust_level: 10
+      allowed_libraries: ["primary", "staging"]
+    - token: "dev-trusted-token"
+      agent_id: "trusted-agent"
+      trust_level: 5
+      allowed_libraries: ["staging"]
+
+extraction:
+  mode: "conservative"
+
+embedding:
+  provider: "none"
+
+defaults:
+  ingest_library: "staging"
+  privacy_level: 3
+
+verification:
+  backend_mode: "none"
+
+logging:
+  level: "INFO"
