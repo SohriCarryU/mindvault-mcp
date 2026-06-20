@@ -2,28 +2,34 @@
 
 `mindvault-mcp` is a privacy-first MCP server for agents that need to turn messy multi-turn conversations into structured, durable knowledge cards.
 
-The project is aimed at Hermes, OpenClaw, and other non-programming agent workflows. It has no Web UI. Markdown files are the source of truth, while SQLite provides a small query index.
+The project is aimed at Hermes, OpenClaw, and other non-programming agent workflows. It has no Web UI. Markdown files are the source of truth, while SQLite provides query indexes and the verification queue.
 
 ## Current Phase
 
-This repository currently implements the phase 1 MVP skeleton:
+This repository currently implements the phase 2 MVP:
 
 - Python 3.11 package structure
 - HTTP/SSE MCP server entrypoint using FastMCP
 - YAML configuration plus `.env.example`
-- Pydantic domain models for cards and agents
+- Pydantic domain models for cards, agents, and verification queue items
 - Markdown card storage with frontmatter
-- SQLite index for basic card lookup and filtering
+- SQLite index for card lookup, filtering, sorting, and verification queue persistence
 - Dual libraries: `primary` and `staging`
-- Minimal token-to-agent permission checks
-- Eight MCP tools with runnable basic behavior
-- Basic pytest coverage
+- Token-to-agent permission checks with library and privacy-level enforcement
+- Rule-based memory extraction with `conservative`, `balanced`, and `aggressive` modes
+- Staging-to-primary review flow with approve/reject behavior
+- Persistent verification queue placeholder with expiration status handling
+- Basic duplicate detection using normalized title, tags, and domain similarity
+- Eight MCP tools with runnable behavior
+- Pytest coverage for core storage, tools, extraction, verification queue, search, and deduplication
 
-Out of scope for this phase:
+Out of scope for the current release:
 
 - Web UI
 - External search APIs
-- Real embedding models
+- Networked verification
+- LLM extraction
+- Real embedding or vector search providers
 - Complex schedulers
 - Full review workflow UI
 - Production authentication center
@@ -58,12 +64,13 @@ Important sections:
 - `storage`: Markdown library paths and SQLite database path
 - `auth`: token-to-agent mapping
 - `extraction`: `conservative`, `balanced`, or `aggressive`
-- `embedding`: `none`, `local`, or `api`
+- `embedding`: `none`, `local`, or `api`; only `none` is implemented
 - `defaults`: default ingest library and privacy level
-- `verification`: placeholder backend mode
+- `verification`: verification backend mode placeholder
+- `dedup`: duplicate detection similarity threshold
 - `logging`: log level
 
-`.env.example` only lists environment variable names. Do not commit real tokens or secrets.
+`.env.example` only lists environment variable names. The current application reads `MINDVAULT_CONFIG`; token values are configured in YAML for this MVP. Do not commit real tokens or secrets.
 
 The example config includes:
 
@@ -72,7 +79,7 @@ The example config includes:
 
 ## Data Layout
 
-Markdown is the durable source of truth:
+Markdown is the durable source of truth for cards:
 
 ```text
 data/
@@ -84,13 +91,36 @@ data/
 
 Each card is saved as a Markdown file with YAML frontmatter. The body renders the same card as readable sections: problem, context, insight, and solution.
 
-SQLite is an index only:
+SQLite stores query indexes and verification queue records:
 
 ```text
 data/mindvault.sqlite
 ```
 
-If the index is deleted, future versions should be able to rebuild it from Markdown. Phase 1 focuses on write-through synchronization.
+The code writes Markdown and SQLite together. Rebuilding SQLite from Markdown is still a roadmap item.
+
+## Card Model
+
+Cards include:
+
+- `card_id`
+- `title`
+- `problem`
+- `context`
+- `insight`
+- `solution`
+- `tags`
+- `domain`
+- `confidence`
+- `status`: `candidate`, `active`, `archived`, or `rejected`
+- `source_agent`
+- `privacy_level`
+- `verification_status`: `verified`, `no_verification_needed`, `pending_verification`, `expired`, or `contested`
+- `valid_until`
+- `possible_duplicate_of`
+- `created_at`
+- `updated_at`
+- `library`: `primary` or `staging`
 
 ## Permission Model
 
@@ -110,43 +140,61 @@ Rules are centralized in `src/mindvault_mcp/auth.py`.
 
 ### `ingest_memory`
 
-Creates a candidate card from raw text and metadata. The default target is `staging`.
+Inputs: `token`, `text`, optional `metadata`.
+
+Creates a card from raw text using the rule-based extractor. The default target is `staging`. If a similar staging card is found, `possible_duplicate_of` is set, but the new card is still retained for review.
 
 ### `search_cards`
 
-Searches by keyword, tags, domain, library, status, and verification status. Results are grouped by library, with `primary` searched first.
+Inputs: `token`, optional `query`, `tags`, `domain`, `library`, `status`, `verification_status`, `limit`, and `offset`.
+
+Searches by keyword and filters. Results are grouped by library, with `primary` searched before `staging`. Ranking is deterministic: library priority, confidence, updated time, then card id. Results are permission-filtered.
 
 ### `list_candidates`
 
-Lists pending candidate cards in `staging`.
+Inputs: `token`, optional `domain`, `tags`, `min_confidence`, `limit`, and `offset`.
+
+Lists `staging` cards with `status=candidate`.
 
 ### `approve_card`
 
-Promotes a card from `staging` to `primary` and marks it `active`.
+Inputs: `token`, `card_id`.
+
+Promotes a card from `staging` to `primary`, marks it `active`, preserves `created_at` and `source_agent`, and updates Markdown plus SQLite.
 
 ### `reject_card`
 
-Marks a staging candidate as `rejected` and retains the Markdown record.
+Inputs: `token`, `card_id`, `reason`.
+
+Marks a staging candidate as `rejected`, records the reason in the card context, and retains the Markdown record.
 
 ### `get_card`
 
-Returns one card after library and privacy checks.
+Inputs: `token`, `card_id`.
+
+Returns one card after library and privacy checks. If `valid_until` is in the past and the card is not `no_verification_needed`, the returned card can be marked `expired`.
 
 ### `update_card`
+
+Inputs: `token`, `card_id`, `fields`.
 
 Updates editable fields, then writes both Markdown and SQLite index state.
 
 ### `queue_verification`
 
-Marks a card as `pending_verification` and returns a queue placeholder. No network verification is run in phase 1.
+Inputs: `token`, `card_id`, optional `reason`.
 
-## Extraction and Embeddings
+Marks a card as `pending_verification` and persists a pending queue record in SQLite. No network verification is run in this release.
 
-Phase 1 extraction is a replaceable rule-based implementation:
+## Extraction, Deduplication, and Embeddings
 
-- Title comes from the first sentence.
-- Card fields are filled conservatively from the input text.
-- `extraction.mode` changes how much text is copied into fields.
+Extraction is currently rule-based and replaceable:
+
+- `conservative`: leaves uncertain fields blank and lowers confidence.
+- `balanced`: fills reasonable fields from labels and sentence structure.
+- `aggressive`: tries to fill all core fields.
+
+Duplicate detection is basic and local. It compares normalized title, tags, and domain using token overlap. The threshold is configured with `dedup.similarity_threshold`.
 
 Embedding providers are configured as:
 
@@ -154,14 +202,14 @@ Embedding providers are configured as:
 - `local`: reserved interface
 - `api`: reserved interface
 
-The project does not pretend to run vector search in this phase.
+The project does not run vector search in this release.
 
 ## Roadmap
 
 - Rebuild SQLite index from Markdown
 - Add real embedding providers behind the existing provider setting
-- Add validation and verification backends
+- Add networked validation and verification backends
 - Add richer candidate review lifecycle
-- Add deduplication beyond the current placeholder
+- Improve deduplication with semantic similarity when embedding support exists
 - Add import/export tooling for other agent memory systems
 - Harden deployment authentication patterns without turning this into a full auth server
