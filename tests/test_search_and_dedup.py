@@ -106,6 +106,8 @@ def test_ingest_sets_possible_duplicate_when_similarity_crosses_threshold(runtim
     assert first.card is not None
     assert second.card is not None
     assert second.card.possible_duplicate_of == first.card.card_id
+    assert second.card.library == Library.STAGING
+    assert runtime.repository.get(second.card.card_id).library == Library.STAGING
 
 
 def test_dedup_threshold_boundary(tmp_path) -> None:
