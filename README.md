@@ -6,7 +6,7 @@ The project is aimed at Hermes, OpenClaw, and other non-programming agent workfl
 
 ## Current Phase
 
-This repository currently implements the phase 2 MVP:
+This repository is in phase 3 stabilization around the phase 2 MVP:
 
 - Python 3.11 package structure
 - HTTP/SSE MCP server entrypoint using FastMCP
@@ -54,6 +54,32 @@ $env:MINDVAULT_CONFIG = "config.yaml"
 mindvault-mcp
 ```
 
+## Local Development
+
+Requirements:
+
+- Python 3.11 or newer
+- `pip`
+- Git
+
+Install the package in editable mode with test dependencies:
+
+```powershell
+pip install -e ".[dev]"
+```
+
+Run the test suite:
+
+```powershell
+pytest -q
+```
+
+The project uses `src/` layout. The console entrypoint is declared in `pyproject.toml`:
+
+```text
+mindvault-mcp = mindvault_mcp.server:main
+```
+
 ## Configuration
 
 Public configuration lives in `config.yaml`.
@@ -70,12 +96,69 @@ Important sections:
 - `dedup`: duplicate detection similarity threshold
 - `logging`: log level
 
-`.env.example` only lists environment variable names. The current application reads `MINDVAULT_CONFIG`; token values are configured in YAML for this MVP. Do not commit real tokens or secrets.
+`.env.example` only lists environment variable names. The current application reads `MINDVAULT_CONFIG`; token values are configured in the selected YAML file for this MVP.
+
+Keep committed `config.yaml` safe for public use. Do not commit real tokens or secrets. For local private credentials, use an uncommitted `.env` and point `MINDVAULT_CONFIG` at an uncommitted local config file.
 
 The example config includes:
 
 - `dev-admin-token`: high-trust admin with access to `primary` and `staging`
 - `dev-trusted-token`: trusted agent with access to `staging`
+
+## Running Locally
+
+Start the MCP server:
+
+```powershell
+mindvault-mcp
+```
+
+Default local settings:
+
+- host: `127.0.0.1`
+- port: `8000`
+- transport: `sse`
+- SSE endpoint: `http://127.0.0.1:8000/sse`
+
+See [MCP Endpoint](docs/mcp-endpoint.md) for transport, endpoint, and auth conventions.
+
+## Testing
+
+Run all tests:
+
+```powershell
+pytest -q
+```
+
+The test suite uses temporary directories for card storage and SQLite databases. It does not require `.env`, external services, or network access.
+
+## CI
+
+GitHub Actions runs on `push` and `pull_request`.
+
+The CI workflow installs the package with:
+
+```text
+pip install -e ".[dev]"
+```
+
+Then runs:
+
+```text
+pytest -q
+```
+
+The workflow targets Python 3.11 on Ubuntu and Windows.
+
+## MCP Integration Notes
+
+MCP clients should connect using the configured server host, port, and transport. With the default SSE configuration, use:
+
+```text
+http://127.0.0.1:8000/sse
+```
+
+Every tool call must include a configured `token`. The token maps to an agent identity with `trust_level` and `allowed_libraries`.
 
 ## Data Layout
 
