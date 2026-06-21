@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 
+from embedding_provider import APIProvider, LocalProvider
 from mindvault_mcp.config import AppConfig, DedupConfig
 from mindvault_mcp.enums import CardStatus, Library
 from mindvault_mcp.models import Card, utc_now
@@ -127,3 +128,57 @@ def test_dedup_threshold_boundary(tmp_path) -> None:
     candidate = Card(title="Agent memory setup review", tags=["memory"], domain="agent-ops")
 
     assert runtime.dedup.find_possible_duplicate(candidate) is None
+
+
+def test_search_with_none_embedding_provider_keeps_keyword_behavior(runtime) -> None:
+    card = Card(title="None embedding search", problem="needle remains keyword based")
+    runtime.repository.save(card)
+
+    results = search_cards(runtime, "trusted-token", query="needle", library="staging")
+
+    assert [found.card_id for found in results.results["staging"]] == [card.card_id]
+
+
+def test_search_with_local_embedding_provider_smoke_path(runtime, monkeypatch) -> None:
+    calls: list[str] = []
+
+    def fake_embed_text(self: LocalProvider, text: str) -> list[float]:
+        calls.append(text)
+        return [0.0] * 384
+
+    monkeypatch.setenv("EMBEDDING_PROVIDER", "local")
+    monkeypatch.setattr(LocalProvider, "embed_text", fake_embed_text)
+    card = Card(title="Local embedding search", problem="needle remains keyword based")
+    runtime.repository.save(card)
+
+    results = search_cards(runtime, "trusted-token", query="needle", library="staging")
+
+    assert calls == ["needle"]
+    assert [found.card_id for found in results.results["staging"]] == [card.card_id]
+
+
+def test_search_with_api_embedding_provider_smoke_path(runtime, monkeypatch) -> None:
+    calls: list[str] = []
+
+    def fake_embed_text(self: APIProvider, text: str) -> list[float]:
+        calls.append(text)
+        return [0.0] * 1536
+
+    monkeypatch.setenv("EMBEDDING_PROVIDER", "api")
+    monkeypatch.setattr(APIProvider, "embed_text", fake_embed_text)
+    card = Card(title="API embedding search", problem="needle remains keyword based")
+    runtime.repository.save(card)
+
+    results = search_cards(runtime, "trusted-token", query="needle", library="staging")
+
+    assert calls == ["needle"]
+    assert [found.card_id for found in results.results["staging"]] == [card.card_id]
+
+
+def test_search_with_invalid_embedding_provider_raises(runtime, monkeypatch) -> None:
+    monkeypatch.setenv("EMBEDDING_PROVIDER", "invalid")
+
+    import pytest
+
+    with pytest.raises(ValueError, match="Unknown provider type"):
+        search_cards(runtime, "trusted-token", query="needle", library="staging")

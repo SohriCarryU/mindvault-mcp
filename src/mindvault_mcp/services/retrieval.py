@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import os
+
+from embedding_provider import create_provider
+
 from mindvault_mcp.config import AppConfig
-from mindvault_mcp.enums import EmbeddingProvider
 
 
 class EmbeddingProviderUnavailable(RuntimeError):
@@ -10,10 +13,11 @@ class EmbeddingProviderUnavailable(RuntimeError):
 
 class EmbeddingService:
     def __init__(self, config: AppConfig):
-        self.provider = config.embedding.provider
+        self.config = config
 
-    def ensure_available(self) -> None:
-        if self.provider in {EmbeddingProvider.LOCAL, EmbeddingProvider.API}:
-            raise EmbeddingProviderUnavailable(
-                f"Embedding provider '{self.provider}' is configured but not implemented in phase 1."
-            )
+    def embed_query(self, query: str | None) -> list[float]:
+        if not query:
+            return []
+        provider_type = os.getenv("EMBEDDING_PROVIDER", str(self.config.embedding.provider))
+        provider = create_provider(provider_type)
+        return provider.embed_text(query)

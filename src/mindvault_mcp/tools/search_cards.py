@@ -21,6 +21,7 @@ def search_cards(
     offset: int = 0,
 ) -> SearchResponse:
     ctx = runtime.auth.authenticate(token)
+    runtime.embeddings.embed_query(query)
     scopes = [Library(library)] if library else [Library.PRIMARY, Library.STAGING]
     results: dict[str, list] = defaultdict(list)
     for scope in scopes:
