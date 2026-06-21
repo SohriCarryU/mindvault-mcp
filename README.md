@@ -6,7 +6,7 @@ The project is aimed at Hermes, OpenClaw, and other non-programming agent workfl
 
 ## Current Phase
 
-This repository is in phase 3 stabilization around the phase 2 MVP:
+This repository is in phase 5 stabilization around the phase 2 MVP:
 
 - Python 3.11 package structure
 - HTTP/SSE MCP server entrypoint using FastMCP
@@ -20,6 +20,7 @@ This repository is in phase 3 stabilization around the phase 2 MVP:
 - Staging-to-primary review flow with approve/reject behavior
 - Persistent verification queue placeholder with expiration status handling
 - Basic duplicate detection using normalized title, tags, and domain similarity
+- Embedding provider abstraction with no-op, local placeholder, and API placeholder modes
 - Eight MCP tools with runnable behavior
 - Pytest coverage for core storage, tools, extraction, verification queue, search, and deduplication
 
@@ -29,7 +30,7 @@ Out of scope for the current release:
 - External search APIs
 - Networked verification
 - LLM extraction
-- Real embedding or vector search providers
+- Real embedding model/API calls and vector search providers
 - Complex schedulers
 - Full review workflow UI
 - Production authentication center
@@ -90,13 +91,13 @@ Important sections:
 - `storage`: Markdown library paths and SQLite database path
 - `auth`: token-to-agent mapping
 - `extraction`: `conservative`, `balanced`, or `aggressive`
-- `embedding`: `none`, `local`, or `api`; only `none` is implemented
+- `embedding`: `none`, `local`, or `api`; default is `none`
 - `defaults`: default ingest library and privacy level
 - `verification`: verification backend mode placeholder
 - `dedup`: duplicate detection similarity threshold
 - `logging`: log level
 
-`.env.example` only lists environment variable names. The current application reads `MINDVAULT_CONFIG`; token values are configured in the selected YAML file for this MVP.
+`.env.example` only lists environment variable names. The current application reads `MINDVAULT_CONFIG` and `EMBEDDING_PROVIDER`; token values are configured in the selected YAML file for this MVP.
 
 Keep committed `config.yaml` safe for public use. Do not commit real tokens or secrets. For local private credentials, use an uncommitted `.env` and point `MINDVAULT_CONFIG` at an uncommitted local config file.
 
@@ -241,6 +242,8 @@ Inputs: `token`, optional `query`, `tags`, `domain`, `library`, `status`, `verif
 
 Searches by keyword and filters. Results are grouped by library, with `primary` searched before `staging`. Ranking is deterministic: library priority, confidence, updated time, then card id. Results are permission-filtered.
 
+If `EMBEDDING_PROVIDER` is set to `local` or `api`, the query is passed through the configured placeholder provider as a smoke path. Search results still use the existing keyword/filter logic because there is no vector store or similarity ranking in this release.
+
 ### `list_candidates`
 
 Inputs: `token`, optional `domain`, `tags`, `min_confidence`, `limit`, and `offset`.
@@ -289,16 +292,17 @@ Duplicate detection is basic and local. It compares normalized title, tags, and 
 
 Embedding providers are configured as:
 
-- `none`: implemented default
-- `local`: reserved interface
-- `api`: reserved interface
+- `none`: implemented default; no vectors and no external calls
+- `local`: placeholder interface; returns fixed zero vectors and does not load a model
+- `api`: placeholder interface; returns fixed zero vectors and does not make network requests
 
-The project does not run vector search in this release.
+The search path can load and call the configured provider for query smoke testing, but the project does not run vector search or semantic ranking in this release.
 
 ## Roadmap
 
 - Rebuild SQLite index from Markdown
-- Add real embedding providers behind the existing provider setting
+- Replace placeholder embedding providers with real local/API implementations
+- Add vector storage and semantic similarity ranking
 - Add networked validation and verification backends
 - Add richer candidate review lifecycle
 - Improve deduplication with semantic similarity when embedding support exists
