@@ -326,3 +326,90 @@ def test_llm_extractor_fallback_on_llm_failure(monkeypatch) -> None:
 
     assert card.problem.startswith("fallback issue")
     assert "rule-based" in card.insight.lower() or "unavailable" in card.context.lower()
+
+
+def test_runtime_uses_rule_based_when_llm_disabled() -> None:
+    from pathlib import Path
+    from mindvault_mcp.tools import build_runtime
+    from mindvault_mcp.services.extraction import RuleBasedExtractor
+
+    config = load_config(Path("missing-test-config.yaml"))
+    config.extraction.llm_enabled = False
+
+    runtime = build_runtime(config)
+
+    assert isinstance(runtime.extractor, RuleBasedExtractor)
+
+
+def test_runtime_uses_llm_extractor_when_enabled() -> None:
+    from pathlib import Path
+    from mindvault_mcp.tools import build_runtime
+    from mindvault_mcp.services.extraction import LLMExtractor
+
+    config = load_config(Path("missing-test-config.yaml"))
+    config.extraction.llm_enabled = True
+
+    runtime = build_runtime(config)
+
+    assert isinstance(runtime.extractor, LLMExtractor)
+
+
+def test_ingest_memory_with_llm_enabled_uses_llm_title(monkeypatch, tmp_path) -> None:
+    from pathlib import Path
+    from mindvault_mcp.enums import Library
+    from mindvault_mcp.tools import build_runtime, ingest_memory
+    from mindvault_mcp.config import AppConfig, AuthAgentConfig, AuthConfig, DefaultsConfig, StorageConfig
+    from mindvault_mcp.schemas import IngestMetadata
+
+    config = AppConfig(
+        storage=StorageConfig(
+            primary_path=tmp_path / "primary",
+            staging_path=tmp_path / "staging",
+            sqlite_path=tmp_path / "mindvault.sqlite",
+        ),
+        auth=AuthConfig(
+            agents=[
+                AuthAgentConfig(
+                    token="test-token",
+                    agent_id="test-agent",
+                    trust_level=10,
+                    allowed_libraries=[Library.PRIMARY, Library.STAGING],
+                )
+            ]
+        ),
+        defaults=DefaultsConfig(ingest_library=Library.STAGING, privacy_level=3),
+    )
+    config.extraction.llm_enabled = True
+
+    def fake_urlopen(request: object, timeout: float | None = None) -> FakeResponse:
+        return FakeResponse(
+            {
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "title": "LLM integration title",
+                                    "problem": "LLM problem",
+                                    "context": "LLM context",
+                                    "insight": "LLM insight",
+                                    "solution": "LLM solution",
+                                    "tags": ["integration"],
+                                    "domain": "testing",
+                                    "confidence": 0.9,
+                                }
+                            )
+                        }
+                    }
+                ]
+            }
+        )
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setenv("LLM_API_KEY", "test-key")
+
+    runtime = build_runtime(config)
+    response = ingest_memory(runtime, "test-token", "Raw integration test text", IngestMetadata())
+
+    assert response.ok is True
+    assert response.card.title == "LLM integration title"
