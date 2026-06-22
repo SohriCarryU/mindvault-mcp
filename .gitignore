@@ -10,8 +10,12 @@ build/
 *.egg-info/
 .env
 data/*.sqlite
+data/*.sqlite-journal
+data/*.sqlite-wal
+data/*.sqlite-shm
 data/*.db
 data/primary/*.md
 data/staging/*.md
 !data/primary/.gitkeep
 !data/staging/.gitkeep
+test-temp-*/

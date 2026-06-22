@@ -6,7 +6,7 @@ The project is aimed at Hermes, OpenClaw, and other non-programming agent workfl
 
 ## Current Phase
 
-This repository is in phase 6-B stabilization around the phase 2 MVP:
+This repository is in Phase 7 documentation wrap-up around the phase 2 MVP:
 
 - Python 3.11 package structure
 - HTTP/SSE MCP server entrypoint using FastMCP
@@ -17,6 +17,7 @@ This repository is in phase 6-B stabilization around the phase 2 MVP:
 - Dual libraries: `primary` and `staging`
 - Token-to-agent permission checks with library and privacy-level enforcement
 - Rule-based memory extraction with `conservative`, `balanced`, and `aggressive` modes
+- Optional LLM extraction through an OpenAI-compatible Chat Completions API, disabled by default with rule-based fallback
 - Staging-to-primary review flow with approve/reject behavior
 - Persistent verification queue placeholder with expiration status handling
 - Minimal URL link validation behind an opt-in external validation flag
@@ -30,7 +31,7 @@ Out of scope for the current release:
 - Web UI
 - External search APIs
 - Fact/content verification beyond URL reachability checks
-- LLM extraction
+- Provider-specific LLM adapters or local LLM APIs that are not OpenAI-compatible
 - Real embedding model/API calls and vector search providers
 - Complex schedulers
 - Full review workflow UI
@@ -91,14 +92,14 @@ Important sections:
 - `server`: host, port, and transport
 - `storage`: Markdown library paths and SQLite database path
 - `auth`: token-to-agent mapping
-- `extraction`: `conservative`, `balanced`, or `aggressive`
+- `extraction`: rule-based mode plus optional LLM extraction settings
 - `embedding`: `none`, `local`, or `api`; default is `none`
 - `defaults`: default ingest library and privacy level
 - `verification`: verification backend mode placeholder, external validation enable flag, and URL validation timeout
 - `dedup`: duplicate detection similarity threshold
 - `logging`: log level
 
-`.env.example` only lists environment variable names. The current application reads `MINDVAULT_CONFIG` and `EMBEDDING_PROVIDER`; token values are configured in the selected YAML file for this MVP.
+`.env.example` only lists environment variable names. The current application reads `MINDVAULT_CONFIG`, `EMBEDDING_PROVIDER`, and optional LLM extraction overrides such as `LLM_EXTRACTION_ENABLED`, `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`, and `LLM_TIMEOUT_SECONDS`; token values are configured in the selected YAML file for this MVP.
 
 Keep committed `config.yaml` safe for public use. Do not commit real tokens or secrets. For local private credentials, use an uncommitted `.env` and point `MINDVAULT_CONFIG` at an uncommitted local config file.
 
@@ -135,6 +136,8 @@ pytest -q
 The test suite uses temporary directories for card storage and SQLite databases. It does not require `.env`, external services, or network access.
 
 External validation is disabled by default. When explicitly enabled, the current validator only checks URL reachability with standard-library `urllib`; tests mock the HTTP layer and do not call the network.
+
+LLM extraction tests mock the API layer and do not make real network requests.
 
 ## CI
 
@@ -237,7 +240,7 @@ Rules are centralized in `src/mindvault_mcp/auth.py`.
 
 Inputs: `token`, `text`, optional `metadata`.
 
-Creates a card from raw text using the rule-based extractor. The default target is `staging`. If a similar staging card is found, `possible_duplicate_of` is set, but the new card is still retained for review.
+Creates a card from raw text using the configured extractor. By default this is the local rule-based extractor; optional LLM extraction can be enabled and falls back to rule-based extraction on configuration or request failures. The default target is `staging`. If a similar staging card is found, `possible_duplicate_of` is set, but the new card is still retained for review.
 
 ### `search_cards`
 
@@ -287,11 +290,13 @@ See [External Validation Protocol](docs/external-validation.md) for the Phase 6-
 
 ## Extraction, Deduplication, and Embeddings
 
-Extraction is currently rule-based and replaceable:
+Extraction is rule-based by default and replaceable:
 
 - `conservative`: leaves uncertain fields blank and lowers confidence.
 - `balanced`: fills reasonable fields from labels and sentence structure.
 - `aggressive`: tries to fill all core fields.
+
+Optional LLM extraction can be enabled with an OpenAI-compatible Chat Completions endpoint. It is disabled by default, requires `LLM_API_KEY` when enabled, sends the full input text to the configured endpoint, and falls back to the rule-based extractor when disabled, missing credentials, timing out, failing, or receiving invalid JSON. See [LLM Extraction](docs/llm-extraction.md) for setup, privacy notes, and mocked-test boundaries.
 
 Duplicate detection is basic and local. It compares normalized title, tags, and domain using token overlap. The threshold is configured with `dedup.similarity_threshold`.
 
