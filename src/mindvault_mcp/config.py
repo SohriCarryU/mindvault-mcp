@@ -84,10 +84,53 @@ def _resolve_paths(config: AppConfig, base_dir: Path) -> AppConfig:
     return config
 
 
+def _env_bool(key: str, fallback: bool) -> bool:
+    """Parse environment variable as bool, fallback on parse error."""
+    value = os.getenv(key)
+    if value is None:
+        return fallback
+    normalized = value.strip().lower()
+    if normalized in ("true", "1", "yes"):
+        return True
+    if normalized in ("false", "0", "no"):
+        return False
+    return fallback
+
+
+def _env_float(key: str, fallback: float) -> float:
+    """Parse environment variable as float, fallback on parse error."""
+    value = os.getenv(key)
+    if value is None:
+        return fallback
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        return fallback
+
+
+def _apply_env_overrides(config: AppConfig) -> AppConfig:
+    """Apply environment variable overrides to config after pydantic validation."""
+    ext = config.extraction
+
+    ext.llm_enabled = _env_bool("LLM_EXTRACTION_ENABLED", ext.llm_enabled)
+
+    if "LLM_BASE_URL" in os.environ:
+        ext.llm_base_url = os.environ["LLM_BASE_URL"]
+
+    if "LLM_MODEL" in os.environ:
+        ext.llm_model = os.environ["LLM_MODEL"]
+
+    ext.llm_timeout_seconds = _env_float("LLM_TIMEOUT_SECONDS", ext.llm_timeout_seconds)
+
+    return config
+
+
 def load_config(path: str | Path | None = None) -> AppConfig:
     config_path = Path(path or os.getenv("MINDVAULT_CONFIG", "config.yaml"))
     raw: dict[str, Any] = {}
     if config_path.exists():
         raw = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
     config = AppConfig.model_validate(raw)
-    return _resolve_paths(config, config_path.parent.resolve())
+    config = _resolve_paths(config, config_path.parent.resolve())
+    config = _apply_env_overrides(config)
+    return config
