@@ -77,6 +77,8 @@ Each validation result contains:
 
 Persisted results are stored in the SQLite `validation_results` table. It records result history by `card_id`, `status`, `checked_at`, `source_type`, `source_ref`, `message`, optional `evidence`, and optional `error`. The table is indexed by card id, status, and checked time so callers can list recent results for a card without scanning card Markdown files.
 
+Repository-level recording first verifies that the target card exists; a missing `card_id` raises `KeyError` and does not persist a validation result.
+
 ## Privacy Boundary
 
 - Default configuration does not validate externally.

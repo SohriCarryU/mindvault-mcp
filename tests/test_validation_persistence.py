@@ -161,3 +161,12 @@ def test_repository_validation_result_preserves_all_result_fields(runtime) -> No
     assert stored[0].message == "Network error"
     assert stored[0].evidence == "method=HEAD"
     assert stored[0].error == "timed out"
+
+
+def test_repository_record_validation_result_rejects_missing_card_without_persisting(runtime) -> None:
+    result = validation_result(card_id="missing-card", status=ValidationStatus.PASSED)
+
+    with pytest.raises(KeyError, match="Card not found"):
+        runtime.repository.record_validation_result(result)
+
+    assert runtime.repository.list_validation_results("missing-card") == []

@@ -102,8 +102,8 @@ class CardRepository:
         return self.sqlite_index.list_verification_queue(status="pending")
 
     def record_validation_result(self, result: ValidationResult) -> Card:
-        self.sqlite_index.record_validation_result(result)
         card = self.get(result.card_id)
+        self.sqlite_index.record_validation_result(result)
         verification_status = _verification_status_for_validation(result.status)
         if verification_status is None:
             return card
