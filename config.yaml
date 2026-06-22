@@ -32,6 +32,7 @@ defaults:
 verification:
   backend_mode: "none"
   external_validation_enabled: false
+  external_validation_timeout_seconds: 5.0
 
 dedup:
   similarity_threshold: 0.72

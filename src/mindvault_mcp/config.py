@@ -47,6 +47,7 @@ class DefaultsConfig(BaseModel):
 class VerificationConfig(BaseModel):
     backend_mode: str = "none"
     external_validation_enabled: bool = False
+    external_validation_timeout_seconds: float = Field(default=5.0, gt=0.0)
 
 
 class DedupConfig(BaseModel):

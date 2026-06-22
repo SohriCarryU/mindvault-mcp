@@ -33,6 +33,7 @@ defaults:
 verification:
   backend_mode: "none"
   external_validation_enabled: true
+  external_validation_timeout_seconds: 2.5
 """,
         encoding="utf-8",
     )
@@ -43,6 +44,7 @@ verification:
     assert config.embedding.provider == EmbeddingProvider.NONE
     assert config.defaults.ingest_library == Library.STAGING
     assert config.verification.external_validation_enabled is True
+    assert config.verification.external_validation_timeout_seconds == 2.5
     assert config.auth.agents[0].agent_id == "a"
 
 
@@ -50,3 +52,4 @@ def test_external_validation_defaults_disabled() -> None:
     config = load_config(Path("missing-test-config.yaml"))
 
     assert config.verification.external_validation_enabled is False
+    assert config.verification.external_validation_timeout_seconds == 5.0

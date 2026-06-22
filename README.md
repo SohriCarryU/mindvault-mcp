@@ -6,7 +6,7 @@ The project is aimed at Hermes, OpenClaw, and other non-programming agent workfl
 
 ## Current Phase
 
-This repository is in phase 6-A stabilization around the phase 2 MVP:
+This repository is in phase 6-B stabilization around the phase 2 MVP:
 
 - Python 3.11 package structure
 - HTTP/SSE MCP server entrypoint using FastMCP
@@ -19,7 +19,7 @@ This repository is in phase 6-A stabilization around the phase 2 MVP:
 - Rule-based memory extraction with `conservative`, `balanced`, and `aggressive` modes
 - Staging-to-primary review flow with approve/reject behavior
 - Persistent verification queue placeholder with expiration status handling
-- External validation protocol skeleton, disabled by default and no-network in this phase
+- Minimal URL link validation behind an opt-in external validation flag
 - Basic duplicate detection using normalized title, tags, and domain similarity
 - Embedding provider abstraction with no-op, local placeholder, and API placeholder modes
 - Eight MCP tools with runnable behavior
@@ -29,7 +29,7 @@ Out of scope for the current release:
 
 - Web UI
 - External search APIs
-- Networked verification
+- Fact/content verification beyond URL reachability checks
 - LLM extraction
 - Real embedding model/API calls and vector search providers
 - Complex schedulers
@@ -94,7 +94,7 @@ Important sections:
 - `extraction`: `conservative`, `balanced`, or `aggressive`
 - `embedding`: `none`, `local`, or `api`; default is `none`
 - `defaults`: default ingest library and privacy level
-- `verification`: verification backend mode placeholder and external validation enable flag
+- `verification`: verification backend mode placeholder, external validation enable flag, and URL validation timeout
 - `dedup`: duplicate detection similarity threshold
 - `logging`: log level
 
@@ -134,7 +134,7 @@ pytest -q
 
 The test suite uses temporary directories for card storage and SQLite databases. It does not require `.env`, external services, or network access.
 
-External validation tests exercise only the no-network protocol skeleton.
+External validation is disabled by default. When explicitly enabled, the current validator only checks URL reachability with standard-library `urllib`; tests mock the HTTP layer and do not call the network.
 
 ## CI
 
@@ -283,7 +283,7 @@ Inputs: `token`, `card_id`, optional `reason`.
 
 Marks a card as `pending_verification` and persists a pending queue record in SQLite. No network verification is run in this release.
 
-See [External Validation Protocol](docs/external-validation.md) for the Phase 6-A no-network validation skeleton and status model.
+See [External Validation Protocol](docs/external-validation.md) for the Phase 6-B URL validator, status model, timeout setting, and privacy boundary.
 
 ## Extraction, Deduplication, and Embeddings
 
@@ -308,7 +308,7 @@ The search path can load and call the configured provider for query smoke testin
 - Rebuild SQLite index from Markdown
 - Replace placeholder embedding providers with real local/API implementations
 - Add vector storage and semantic similarity ranking
-- Add networked validation and verification backends
+- Persist validation results and map link outcomes into card verification lifecycle
 - Add richer candidate review lifecycle
 - Improve deduplication with semantic similarity when embedding support exists
 - Add import/export tooling for other agent memory systems
