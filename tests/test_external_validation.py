@@ -70,7 +70,9 @@ def test_external_validation_missing_source_ref_is_skipped(monkeypatch: pytest.M
     assert "source_ref" in result.message
 
 
-def test_create_validation_job_reuses_verification_queue_item(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_create_validation_job_skips_when_external_validation_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.delenv("EXTERNAL_VALIDATION_ENABLED", raising=False)
     service = ExternalValidationService(AppConfig())
     card = Card(title="Queue validation job")
@@ -80,7 +82,22 @@ def test_create_validation_job_reuses_verification_queue_item(monkeypatch: pytes
     assert item.card_id == card.card_id
     assert item.queued_by == "agent-1"
     assert item.reason == "Check source freshness"
+    assert item.status == ValidationStatus.SKIPPED.value
+    assert "disabled" in item.note.lower()
+
+
+def test_create_validation_job_pending_when_external_validation_enabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("EXTERNAL_VALIDATION_ENABLED", "true")
+    service = ExternalValidationService(AppConfig())
+    card = Card(title="Queue enabled validation job")
+
+    item = service.create_validation_job(card, queued_by="agent-1", reason="Check source freshness")
+
+    assert item.card_id == card.card_id
     assert item.status == ValidationStatus.PENDING.value
+    assert "queued" in item.note.lower()
 
 
 def test_validation_result_rejects_invalid_status() -> None:

@@ -51,6 +51,15 @@ class ExternalValidationService:
         self, card: Card, queued_by: str, reason: str = ""
     ) -> VerificationQueueItem:
         self._require_card_id(card)
+        if not self.enabled:
+            return VerificationQueueItem(
+                card_id=card.card_id,
+                queued_by=queued_by,
+                backend_mode=self.backend_mode,
+                reason=reason,
+                status=ValidationStatus.SKIPPED.value,
+                note="External validation is disabled; no validation job was queued.",
+            )
         return VerificationQueueItem(
             card_id=card.card_id,
             queued_by=queued_by,
