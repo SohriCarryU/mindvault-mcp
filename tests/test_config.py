@@ -30,6 +30,9 @@ embedding:
 defaults:
   ingest_library: "staging"
   privacy_level: 2
+verification:
+  backend_mode: "none"
+  external_validation_enabled: true
 """,
         encoding="utf-8",
     )
@@ -39,4 +42,11 @@ defaults:
     assert config.extraction.mode == ExtractionMode.BALANCED
     assert config.embedding.provider == EmbeddingProvider.NONE
     assert config.defaults.ingest_library == Library.STAGING
+    assert config.verification.external_validation_enabled is True
     assert config.auth.agents[0].agent_id == "a"
+
+
+def test_external_validation_defaults_disabled() -> None:
+    config = load_config(Path("missing-test-config.yaml"))
+
+    assert config.verification.external_validation_enabled is False

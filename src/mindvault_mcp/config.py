@@ -46,6 +46,7 @@ class DefaultsConfig(BaseModel):
 
 class VerificationConfig(BaseModel):
     backend_mode: str = "none"
+    external_validation_enabled: bool = False
 
 
 class DedupConfig(BaseModel):

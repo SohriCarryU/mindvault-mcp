@@ -6,7 +6,7 @@ The project is aimed at Hermes, OpenClaw, and other non-programming agent workfl
 
 ## Current Phase
 
-This repository is in phase 5 stabilization around the phase 2 MVP:
+This repository is in phase 6-A stabilization around the phase 2 MVP:
 
 - Python 3.11 package structure
 - HTTP/SSE MCP server entrypoint using FastMCP
@@ -19,6 +19,7 @@ This repository is in phase 5 stabilization around the phase 2 MVP:
 - Rule-based memory extraction with `conservative`, `balanced`, and `aggressive` modes
 - Staging-to-primary review flow with approve/reject behavior
 - Persistent verification queue placeholder with expiration status handling
+- External validation protocol skeleton, disabled by default and no-network in this phase
 - Basic duplicate detection using normalized title, tags, and domain similarity
 - Embedding provider abstraction with no-op, local placeholder, and API placeholder modes
 - Eight MCP tools with runnable behavior
@@ -93,7 +94,7 @@ Important sections:
 - `extraction`: `conservative`, `balanced`, or `aggressive`
 - `embedding`: `none`, `local`, or `api`; default is `none`
 - `defaults`: default ingest library and privacy level
-- `verification`: verification backend mode placeholder
+- `verification`: verification backend mode placeholder and external validation enable flag
 - `dedup`: duplicate detection similarity threshold
 - `logging`: log level
 
@@ -132,6 +133,8 @@ pytest -q
 ```
 
 The test suite uses temporary directories for card storage and SQLite databases. It does not require `.env`, external services, or network access.
+
+External validation tests exercise only the no-network protocol skeleton.
 
 ## CI
 
@@ -279,6 +282,8 @@ Updates editable fields, then writes both Markdown and SQLite index state.
 Inputs: `token`, `card_id`, optional `reason`.
 
 Marks a card as `pending_verification` and persists a pending queue record in SQLite. No network verification is run in this release.
+
+See [External Validation Protocol](docs/external-validation.md) for the Phase 6-A no-network validation skeleton and status model.
 
 ## Extraction, Deduplication, and Embeddings
 

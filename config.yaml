@@ -31,6 +31,7 @@ defaults:
 
 verification:
   backend_mode: "none"
+  external_validation_enabled: false
 
 dedup:
   similarity_threshold: 0.72
