@@ -40,10 +40,16 @@ def _env_bool(name: str) -> bool | None:
 class ExternalValidationService:
     def __init__(self, config: AppConfig):
         env_enabled = _env_bool("EXTERNAL_VALIDATION_ENABLED")
-        self.enabled = env_enabled if env_enabled is not None else config.verification.external_validation_enabled
+        self.enabled = (
+            env_enabled
+            if env_enabled is not None
+            else config.verification.external_validation_enabled
+        )
         self.backend_mode = config.verification.backend_mode
 
-    def create_validation_job(self, card: Card, queued_by: str, reason: str = "") -> VerificationQueueItem:
+    def create_validation_job(
+        self, card: Card, queued_by: str, reason: str = ""
+    ) -> VerificationQueueItem:
         self._require_card_id(card)
         return VerificationQueueItem(
             card_id=card.card_id,

@@ -5,7 +5,11 @@ from pydantic import ValidationError
 
 from mindvault_mcp.config import AppConfig, VerificationConfig
 from mindvault_mcp.models import Card
-from mindvault_mcp.services.validation import ExternalValidationService, ValidationResult, ValidationStatus
+from mindvault_mcp.services.validation import (
+    ExternalValidationService,
+    ValidationResult,
+    ValidationStatus,
+)
 
 
 def test_external_validation_disabled_returns_skipped(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -81,7 +85,13 @@ def test_create_validation_job_reuses_verification_queue_item(monkeypatch: pytes
 
 def test_validation_result_rejects_invalid_status() -> None:
     with pytest.raises(ValidationError):
-        ValidationResult(card_id="card-1", status="invalid", source_type="url", source_ref="x", message="bad")
+        ValidationResult(
+            card_id="card-1",
+            status="invalid",
+            source_type="url",
+            source_ref="x",
+            message="bad",
+        )
 
 
 def test_validate_card_rejects_blank_card_id(monkeypatch: pytest.MonkeyPatch) -> None:
