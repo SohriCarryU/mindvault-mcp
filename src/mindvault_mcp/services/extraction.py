@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+import os
 import re
 
 from mindvault_mcp.config import AppConfig
 from mindvault_mcp.enums import CardStatus, ExtractionMode, Library, VerificationStatus
 from mindvault_mcp.models import Card
 from mindvault_mcp.schemas import IngestMetadata
+from mindvault_mcp.services.llm_extraction import LLMExtractionService
 
 
 class Extractor(ABC):
@@ -180,6 +182,54 @@ class RuleBasedExtractor(Extractor):
         return f"{existing} {value}"
 
 
-class LLMExtractorPlaceholder(Extractor):
+class LLMExtractor(Extractor):
+    """LLM-backed extraction with rule-based fallback.
+
+    When LLM extraction succeeds, it builds a Card from the LLM result.
+    Metadata overrides: tags, domain (if not 'general'), confidence, source_agent
+    take precedence over LLM output.
+
+    When LLM extraction fails (disabled, no API key, network error, invalid JSON),
+    it falls back to RuleBasedExtractor.
+    """
+
+    def __init__(self, config: AppConfig):
+        self.config = config
+        self.llm_service = LLMExtractionService(config)
+        self.fallback = RuleBasedExtractor(config)
+
     def extract(self, text: str, metadata: IngestMetadata, source_agent: str) -> Card:
-        raise NotImplementedError("LLM extraction is intentionally not implemented in phase 2.")
+        api_key = os.getenv("LLM_API_KEY")
+        llm_result = self.llm_service.extract_via_llm(text, metadata, api_key)
+
+        if llm_result is None:
+            return self.fallback.extract(text, metadata, source_agent)
+
+        tags = metadata.tags if metadata.tags else llm_result.get("tags", [])
+        domain = metadata.domain if metadata.domain != "general" else llm_result.get("domain", "general")
+        confidence = (
+            metadata.confidence if metadata.confidence is not None else llm_result.get("confidence", 0.5)
+        )
+        library = metadata.library or self.config.defaults.ingest_library
+        status = CardStatus.CANDIDATE if library == Library.STAGING else CardStatus.ACTIVE
+
+        return Card(
+            title=llm_result.get("title", "Untitled memory"),
+            problem=llm_result.get("problem", ""),
+            context=llm_result.get("context", ""),
+            insight=llm_result.get("insight", ""),
+            solution=llm_result.get("solution", ""),
+            tags=tags,
+            domain=domain,
+            confidence=confidence,
+            status=status,
+            source_agent=metadata.source_agent or source_agent,
+            privacy_level=(
+                metadata.privacy_level
+                if metadata.privacy_level is not None
+                else self.config.defaults.privacy_level
+            ),
+            verification_status=VerificationStatus.NO_VERIFICATION_NEEDED,
+            valid_until=metadata.valid_until,
+            library=library,
+        )

@@ -1,5 +1,5 @@
 from .dedup import DuplicateDetector
-from .extraction import LLMExtractorPlaceholder, RuleBasedExtractor
+from .extraction import LLMExtractor, RuleBasedExtractor
 from .retrieval import EmbeddingService
 from .validation import ExternalValidationService, ValidationResult, ValidationStatus
 from .verification import VerificationService
@@ -8,7 +8,7 @@ __all__ = [
     "DuplicateDetector",
     "EmbeddingService",
     "ExternalValidationService",
-    "LLMExtractorPlaceholder",
+    "LLMExtractor",
     "RuleBasedExtractor",
     "ValidationResult",
     "ValidationStatus",
