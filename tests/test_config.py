@@ -53,3 +53,13 @@ def test_external_validation_defaults_disabled() -> None:
 
     assert config.verification.external_validation_enabled is False
     assert config.verification.external_validation_timeout_seconds == 5.0
+
+
+def test_llm_extraction_defaults_disabled() -> None:
+    config = load_config(Path("missing-test-config.yaml"))
+
+    assert config.extraction.llm_enabled is False
+    assert config.extraction.llm_provider == "openai"
+    assert config.extraction.llm_model == "gpt-4o-mini"
+    assert config.extraction.llm_base_url == "https://api.openai.com/v1"
+    assert config.extraction.llm_timeout_seconds == 15.0

@@ -21,6 +21,11 @@ auth:
 
 extraction:
   mode: "conservative"
+  llm_enabled: false
+  llm_provider: "openai"
+  llm_model: "gpt-4o-mini"
+  llm_base_url: "https://api.openai.com/v1"
+  llm_timeout_seconds: 15.0
 
 embedding:
   provider: "none"

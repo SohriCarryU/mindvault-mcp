@@ -33,6 +33,11 @@ class AuthConfig(BaseModel):
 
 class ExtractionConfig(BaseModel):
     mode: ExtractionMode = ExtractionMode.CONSERVATIVE
+    llm_enabled: bool = False
+    llm_provider: str = "openai"
+    llm_model: str = "gpt-4o-mini"
+    llm_base_url: str = "https://api.openai.com/v1"
+    llm_timeout_seconds: float = Field(default=15.0, gt=0.0)
 
 
 class EmbeddingConfig(BaseModel):
