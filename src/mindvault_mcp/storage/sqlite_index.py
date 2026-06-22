@@ -88,6 +88,21 @@ class SQLiteIndex:
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_validation_results_checked_at ON validation_results(checked_at)"
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS card_embeddings (
+                    card_id TEXT NOT NULL,
+                    provider TEXT NOT NULL,
+                    dimension INTEGER NOT NULL,
+                    vector_json TEXT NOT NULL,
+                    searchable_text_hash TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    PRIMARY KEY(card_id, provider)
+                )
+                """
+            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_card_embeddings_provider ON card_embeddings(provider)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_card_embeddings_card ON card_embeddings(card_id)")
 
     def upsert_card(self, card: Card) -> None:
         with self.connect() as conn:
@@ -130,6 +145,7 @@ class SQLiteIndex:
     def delete_card(self, card_id: str) -> None:
         with self.connect() as conn:
             conn.execute("DELETE FROM cards WHERE card_id = ?", (card_id,))
+            conn.execute("DELETE FROM card_embeddings WHERE card_id = ?", (card_id,))
 
     def get_card_location(self, card_id: str) -> tuple[str, Library] | None:
         with self.connect() as conn:
@@ -283,3 +299,55 @@ class SQLiteIndex:
             )
             for row in rows
         ]
+
+    def upsert_card_embedding(
+        self,
+        card_id: str,
+        provider: str,
+        vector: list[float],
+        searchable_text_hash: str,
+        updated_at: str,
+    ) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO card_embeddings (
+                    card_id, provider, dimension, vector_json, searchable_text_hash, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(card_id, provider) DO UPDATE SET
+                    dimension=excluded.dimension,
+                    vector_json=excluded.vector_json,
+                    searchable_text_hash=excluded.searchable_text_hash,
+                    updated_at=excluded.updated_at
+                """,
+                (
+                    card_id,
+                    provider,
+                    len(vector),
+                    json.dumps(vector),
+                    searchable_text_hash,
+                    updated_at,
+                ),
+            )
+
+    def get_card_embedding(self, card_id: str, provider: str) -> dict[str, object] | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                """
+                SELECT card_id, provider, dimension, vector_json, searchable_text_hash, updated_at
+                FROM card_embeddings
+                WHERE card_id = ? AND provider = ?
+                """,
+                (card_id, provider),
+            ).fetchone()
+        if row is None:
+            return None
+        return {
+            "card_id": row["card_id"],
+            "provider": row["provider"],
+            "dimension": row["dimension"],
+            "vector": json.loads(row["vector_json"]),
+            "searchable_text_hash": row["searchable_text_hash"],
+            "updated_at": row["updated_at"],
+        }

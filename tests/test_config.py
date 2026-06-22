@@ -128,3 +128,13 @@ def test_llm_env_invalid_timeout_keeps_config(tmp_path: Path, monkeypatch) -> No
     config = load_config(config_file)
 
     assert config.extraction.llm_timeout_seconds == 4.0
+
+
+def test_embedding_provider_env_overrides_config(tmp_path: Path, monkeypatch) -> None:
+    config_file = tmp_path / "config.yaml"
+    config_file.write_text("embedding:\n  provider: none\n", encoding="utf-8")
+    monkeypatch.setenv("EMBEDDING_PROVIDER", "local")
+
+    config = load_config(config_file)
+
+    assert config.embedding.provider == EmbeddingProvider.LOCAL

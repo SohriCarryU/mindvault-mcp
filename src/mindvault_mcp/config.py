@@ -111,6 +111,7 @@ def _env_float(key: str, fallback: float) -> float:
 def _apply_env_overrides(config: AppConfig) -> AppConfig:
     """Apply environment variable overrides to config after pydantic validation."""
     ext = config.extraction
+    embedding = config.embedding
 
     ext.llm_enabled = _env_bool("LLM_EXTRACTION_ENABLED", ext.llm_enabled)
 
@@ -121,6 +122,9 @@ def _apply_env_overrides(config: AppConfig) -> AppConfig:
         ext.llm_model = os.environ["LLM_MODEL"]
 
     ext.llm_timeout_seconds = _env_float("LLM_TIMEOUT_SECONDS", ext.llm_timeout_seconds)
+
+    if "EMBEDDING_PROVIDER" in os.environ:
+        embedding.provider = EmbeddingProvider(os.environ["EMBEDDING_PROVIDER"])
 
     return config
 

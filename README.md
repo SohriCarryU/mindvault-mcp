@@ -6,14 +6,14 @@ The project is aimed at Hermes, OpenClaw, and other non-programming agent workfl
 
 ## Current Phase
 
-This repository includes Phase 6-C external validation persistence and Phase 7 optional LLM extraction documentation around the phase 2 MVP:
+This repository includes Phase 8-A vector cache semantic ranking, Phase 7 optional LLM extraction, and Phase 6-C external validation persistence around the phase 2 MVP:
 
 - Python 3.11 package structure
 - HTTP/SSE MCP server entrypoint using FastMCP
 - YAML configuration plus `.env.example`
 - Pydantic domain models for cards, agents, and verification queue items
 - Markdown card storage with frontmatter
-- SQLite index for card lookup, filtering, sorting, verification queue persistence, and validation result history
+- SQLite index for card lookup, filtering, sorting, verification queue persistence, validation result history, and cached card vectors
 - Dual libraries: `primary` and `staging`
 - Token-to-agent permission checks with library and privacy-level enforcement
 - Rule-based memory extraction with `conservative`, `balanced`, and `aggressive` modes
@@ -22,7 +22,7 @@ This repository includes Phase 6-C external validation persistence and Phase 7 o
 - Persistent verification queue placeholder with expiration status handling
 - Minimal URL link validation behind an opt-in external validation flag, with persisted results and conservative card status mapping
 - Basic duplicate detection using normalized title, tags, and domain similarity
-- Embedding provider abstraction with no-op, local placeholder, and API placeholder modes
+- Embedding provider abstraction with no-op, local placeholder, API placeholder, and cached vector ranking when usable vectors are available
 - Eight MCP tools with runnable behavior
 - Pytest coverage for core storage, tools, extraction, verification queue, search, and deduplication
 
@@ -32,7 +32,7 @@ Out of scope for the current release:
 - External search APIs
 - Fact/content verification beyond URL reachability checks
 - Provider-specific LLM adapters or local LLM APIs that are not OpenAI-compatible
-- Real embedding model/API calls and vector search providers
+- Real embedding model/API calls
 - Complex schedulers
 - Full review workflow UI
 - Production authentication center
@@ -139,6 +139,8 @@ External validation is disabled by default. When explicitly enabled, the current
 
 LLM extraction tests mock the API layer and do not make real network requests.
 
+Embedding tests use placeholder providers or monkeypatches and do not make real network requests.
+
 ## CI
 
 GitHub Actions runs on `push` and `pull_request`.
@@ -189,7 +191,7 @@ data/
 
 Each card is saved as a Markdown file with YAML frontmatter. The body renders the same card as readable sections: problem, context, insight, and solution.
 
-SQLite stores query indexes, verification queue records, and validation result history:
+SQLite stores query indexes, verification queue records, validation result history, and vector cache rows:
 
 ```text
 data/mindvault.sqlite
@@ -248,7 +250,7 @@ Inputs: `token`, optional `query`, `tags`, `domain`, `library`, `status`, `verif
 
 Searches by keyword and filters. Results are grouped by library, with `primary` searched before `staging`. Ranking is deterministic: library priority, confidence, updated time, then card id. Results are permission-filtered.
 
-If `EMBEDDING_PROVIDER` is set to `local` or `api`, the query is passed through the configured placeholder provider as a smoke path. Search results still use the existing keyword/filter logic because there is no vector store or similarity ranking in this release.
+If `EMBEDDING_PROVIDER` is set to `local` or `api` and the provider returns usable non-zero vectors, readable candidate cards can be ranked by cosine similarity using vectors cached in SQLite. If vectors are unavailable, empty, zero, or mismatched, search falls back to the existing keyword/filter logic.
 
 ### `list_candidates`
 
@@ -306,13 +308,12 @@ Embedding providers are configured as:
 - `local`: placeholder interface; returns fixed zero vectors and does not load a model
 - `api`: placeholder interface; returns fixed zero vectors and does not make network requests
 
-The search path can load and call the configured provider for query smoke testing, but the project does not run vector search or semantic ranking in this release.
+Phase 8-A stores card vectors in SQLite as cache/index data, never in Markdown. The current placeholder providers return zero vectors by default, so normal local behavior still falls back to keyword search unless tests or future real providers supply usable vectors. See [Embedding Providers](docs/embedding-providers.md) for privacy boundaries and cache behavior.
 
 ## Roadmap
 
 - Rebuild SQLite index from Markdown
 - Replace placeholder embedding providers with real local/API implementations
-- Add vector storage and semantic similarity ranking
 - Add richer candidate review lifecycle
 - Improve deduplication with semantic similarity when embedding support exists
 - Add import/export tooling for other agent memory systems
