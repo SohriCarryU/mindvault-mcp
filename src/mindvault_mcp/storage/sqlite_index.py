@@ -3,10 +3,13 @@ from __future__ import annotations
 import json
 import sqlite3
 from pathlib import Path
-from typing import Iterable
+from typing import TYPE_CHECKING, Iterable
 
 from mindvault_mcp.enums import Library
 from mindvault_mcp.models import Card, VerificationQueueItem
+
+if TYPE_CHECKING:
+    from mindvault_mcp.services.validation import ValidationResult
 
 
 class SQLiteIndex:
@@ -65,6 +68,26 @@ class SQLiteIndex:
             )
             conn.execute("CREATE INDEX IF NOT EXISTS idx_verification_queue_status ON verification_queue(status)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_verification_queue_card ON verification_queue(card_id)")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS validation_results (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    card_id TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    checked_at TEXT NOT NULL,
+                    source_type TEXT NOT NULL,
+                    source_ref TEXT NOT NULL,
+                    message TEXT NOT NULL,
+                    evidence TEXT,
+                    error TEXT
+                )
+                """
+            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_validation_results_card ON validation_results(card_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_validation_results_status ON validation_results(status)")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_validation_results_checked_at ON validation_results(checked_at)"
+            )
 
     def upsert_card(self, card: Card) -> None:
         with self.connect() as conn:
@@ -208,6 +231,55 @@ class SQLiteIndex:
                 reason=row["reason"],
                 status=row["status"],
                 note=row["note"],
+            )
+            for row in rows
+        ]
+
+    def record_validation_result(self, result: ValidationResult) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO validation_results (
+                    card_id, status, checked_at, source_type, source_ref, message, evidence, error
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    result.card_id,
+                    result.status.value,
+                    result.checked_at.isoformat(),
+                    result.source_type,
+                    result.source_ref,
+                    result.message,
+                    result.evidence,
+                    result.error,
+                ),
+            )
+
+    def list_validation_results(self, card_id: str, limit: int = 20, offset: int = 0) -> list[ValidationResult]:
+        from mindvault_mcp.services.validation import ValidationResult, ValidationStatus
+
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT card_id, status, checked_at, source_type, source_ref, message, evidence, error
+                FROM validation_results
+                WHERE card_id = ?
+                ORDER BY checked_at DESC, id DESC
+                LIMIT ? OFFSET ?
+                """,
+                (card_id, limit, offset),
+            ).fetchall()
+        return [
+            ValidationResult(
+                card_id=row["card_id"],
+                status=ValidationStatus(row["status"]),
+                checked_at=row["checked_at"],
+                source_type=row["source_type"],
+                source_ref=row["source_ref"],
+                message=row["message"],
+                evidence=row["evidence"],
+                error=row["error"],
             )
             for row in rows
         ]

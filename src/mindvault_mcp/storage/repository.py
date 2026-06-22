@@ -2,9 +2,23 @@ from __future__ import annotations
 
 from mindvault_mcp.enums import CardStatus, Library, VerificationStatus
 from mindvault_mcp.models import Card, VerificationQueueItem, utc_now
+from mindvault_mcp.services.validation import ValidationResult, ValidationStatus
 
 from .markdown_store import MarkdownStore
 from .sqlite_index import SQLiteIndex
+
+
+def _verification_status_for_validation(
+    status: ValidationStatus,
+) -> VerificationStatus | None:
+    mapping = {
+        ValidationStatus.PASSED: VerificationStatus.VERIFIED,
+        ValidationStatus.STALE: VerificationStatus.EXPIRED,
+        ValidationStatus.FAILED: VerificationStatus.CONTESTED,
+        ValidationStatus.ERROR: VerificationStatus.PENDING_VERIFICATION,
+        ValidationStatus.PENDING: VerificationStatus.PENDING_VERIFICATION,
+    }
+    return mapping.get(status)
 
 
 class CardRepository:
@@ -86,6 +100,20 @@ class CardRepository:
 
     def list_pending_verifications(self) -> list[VerificationQueueItem]:
         return self.sqlite_index.list_verification_queue(status="pending")
+
+    def record_validation_result(self, result: ValidationResult) -> Card:
+        self.sqlite_index.record_validation_result(result)
+        card = self.get(result.card_id)
+        verification_status = _verification_status_for_validation(result.status)
+        if verification_status is None:
+            return card
+        card.verification_status = verification_status
+        return self.save(card)
+
+    def list_validation_results(
+        self, card_id: str, limit: int = 20, offset: int = 0
+    ) -> list[ValidationResult]:
+        return self.sqlite_index.list_validation_results(card_id, limit=limit, offset=offset)
 
     def _apply_expiration(self, card: Card) -> Card:
         if (

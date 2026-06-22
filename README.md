@@ -6,21 +6,21 @@ The project is aimed at Hermes, OpenClaw, and other non-programming agent workfl
 
 ## Current Phase
 
-This repository is in Phase 7 documentation wrap-up around the phase 2 MVP:
+This repository includes Phase 6-C external validation persistence and Phase 7 optional LLM extraction documentation around the phase 2 MVP:
 
 - Python 3.11 package structure
 - HTTP/SSE MCP server entrypoint using FastMCP
 - YAML configuration plus `.env.example`
 - Pydantic domain models for cards, agents, and verification queue items
 - Markdown card storage with frontmatter
-- SQLite index for card lookup, filtering, sorting, and verification queue persistence
+- SQLite index for card lookup, filtering, sorting, verification queue persistence, and validation result history
 - Dual libraries: `primary` and `staging`
 - Token-to-agent permission checks with library and privacy-level enforcement
 - Rule-based memory extraction with `conservative`, `balanced`, and `aggressive` modes
 - Optional LLM extraction through an OpenAI-compatible Chat Completions API, disabled by default with rule-based fallback
 - Staging-to-primary review flow with approve/reject behavior
 - Persistent verification queue placeholder with expiration status handling
-- Minimal URL link validation behind an opt-in external validation flag
+- Minimal URL link validation behind an opt-in external validation flag, with persisted results and conservative card status mapping
 - Basic duplicate detection using normalized title, tags, and domain similarity
 - Embedding provider abstraction with no-op, local placeholder, and API placeholder modes
 - Eight MCP tools with runnable behavior
@@ -95,7 +95,7 @@ Important sections:
 - `extraction`: rule-based mode plus optional LLM extraction settings
 - `embedding`: `none`, `local`, or `api`; default is `none`
 - `defaults`: default ingest library and privacy level
-- `verification`: verification backend mode placeholder, external validation enable flag, and URL validation timeout
+- `verification`: verification backend mode placeholder, external validation enable flag, URL validation timeout, and persisted result history
 - `dedup`: duplicate detection similarity threshold
 - `logging`: log level
 
@@ -135,7 +135,7 @@ pytest -q
 
 The test suite uses temporary directories for card storage and SQLite databases. It does not require `.env`, external services, or network access.
 
-External validation is disabled by default. When explicitly enabled, the current validator only checks URL reachability with standard-library `urllib`; tests mock the HTTP layer and do not call the network.
+External validation is disabled by default. When explicitly enabled, the current validator only checks URL reachability with standard-library `urllib`; tests mock the HTTP layer and do not call the network. Phase 6-C persists validation results and maps outcomes conservatively to card `verification_status`.
 
 LLM extraction tests mock the API layer and do not make real network requests.
 
@@ -189,7 +189,7 @@ data/
 
 Each card is saved as a Markdown file with YAML frontmatter. The body renders the same card as readable sections: problem, context, insight, and solution.
 
-SQLite stores query indexes and verification queue records:
+SQLite stores query indexes, verification queue records, and validation result history:
 
 ```text
 data/mindvault.sqlite
@@ -284,9 +284,9 @@ Updates editable fields, then writes both Markdown and SQLite index state.
 
 Inputs: `token`, `card_id`, optional `reason`.
 
-Marks a card as `pending_verification` and persists a pending queue record in SQLite. No network verification is run in this release.
+Marks a card as `pending_verification` and persists a pending queue record in SQLite. No network verification is run by this tool.
 
-See [External Validation Protocol](docs/external-validation.md) for the Phase 6-B URL validator, status model, timeout setting, and privacy boundary.
+See [External Validation Protocol](docs/external-validation.md) for the Phase 6-C URL validator, persisted result history, status mapping, timeout setting, and privacy boundary.
 
 ## Extraction, Deduplication, and Embeddings
 
@@ -313,7 +313,6 @@ The search path can load and call the configured provider for query smoke testin
 - Rebuild SQLite index from Markdown
 - Replace placeholder embedding providers with real local/API implementations
 - Add vector storage and semantic similarity ranking
-- Persist validation results and map link outcomes into card verification lifecycle
 - Add richer candidate review lifecycle
 - Improve deduplication with semantic similarity when embedding support exists
 - Add import/export tooling for other agent memory systems
