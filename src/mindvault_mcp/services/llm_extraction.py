@@ -90,7 +90,53 @@ class LLMExtractionService:
         except (json.JSONDecodeError, TypeError):
             return None
 
-        if not isinstance(result, dict):
+        return self._normalize_result(result, fallback_text=text)
+
+    def _normalize_result(self, raw: object, fallback_text: str = "") -> dict | None:
+        if not isinstance(raw, dict):
             return None
 
-        return result
+        normalized = {
+            "title": self._string_field(raw.get("title")),
+            "problem": self._string_field(raw.get("problem")),
+            "context": self._string_field(raw.get("context")),
+            "insight": self._string_field(raw.get("insight")),
+            "solution": self._string_field(raw.get("solution")),
+            "tags": self._tags(raw.get("tags")),
+            "domain": self._string_field(raw.get("domain")) or "general",
+            "confidence": self._confidence(raw.get("confidence")),
+        }
+
+        if not normalized["title"]:
+            normalized["title"] = self._title_from_text(
+                normalized["context"] or normalized["problem"] or fallback_text
+            )
+        else:
+            normalized["title"] = self._title_from_text(normalized["title"])
+
+        return normalized
+
+    def _string_field(self, value: object) -> str:
+        if value is None:
+            return ""
+        return str(value).strip()
+
+    def _tags(self, value: object) -> list[str]:
+        if not isinstance(value, list):
+            return []
+        return [item.strip() for item in value if isinstance(item, str) and item.strip()]
+
+    def _confidence(self, value: object) -> float:
+        if value is None:
+            return 0.5
+        try:
+            confidence = float(value)
+        except (TypeError, ValueError):
+            return 0.5
+        return max(0.0, min(1.0, confidence))
+
+    def _title_from_text(self, text: str) -> str:
+        title = text.strip().rstrip(".!?") or "Untitled memory"
+        if len(title) > 80:
+            return title[:77].rstrip() + "..."
+        return title

@@ -134,3 +134,72 @@ def test_llm_parse_failures_return_none(monkeypatch) -> None:
 
     for _ in range(4):
         assert service.extract_via_llm("Raw memory text", api_key="test-key") is None
+
+
+def _service() -> LLMExtractionService:
+    config = load_config(Path("missing-test-config.yaml"))
+    return LLMExtractionService(config)
+
+
+def test_normalize_tags_not_list_becomes_empty() -> None:
+    result = _service()._normalize_result({"title": "t", "tags": "a,b,c"})
+    assert result is not None
+    assert result["tags"] == []
+
+
+def test_normalize_tags_filters_non_strings() -> None:
+    result = _service()._normalize_result({"title": "t", "tags": ["a", 1, "b", None]})
+    assert result is not None
+    assert result["tags"] == ["a", "b"]
+
+
+def test_normalize_missing_confidence_defaults_half() -> None:
+    result = _service()._normalize_result({"title": "t"})
+    assert result is not None
+    assert result["confidence"] == 0.5
+
+
+def test_normalize_confidence_clamped_low() -> None:
+    result = _service()._normalize_result({"title": "t", "confidence": -2})
+    assert result is not None
+    assert result["confidence"] == 0.0
+
+
+def test_normalize_confidence_clamped_high() -> None:
+    result = _service()._normalize_result({"title": "t", "confidence": 5})
+    assert result is not None
+    assert result["confidence"] == 1.0
+
+
+def test_normalize_invalid_confidence_defaults_half() -> None:
+    result = _service()._normalize_result({"title": "t", "confidence": "high"})
+    assert result is not None
+    assert result["confidence"] == 0.5
+
+
+def test_normalize_long_title_truncated() -> None:
+    long_title = "x" * 200
+    result = _service()._normalize_result({"title": long_title})
+    assert result is not None
+    assert len(result["title"]) <= 80
+
+
+def test_normalize_empty_title_generated_from_context() -> None:
+    result = _service()._normalize_result(
+        {"title": "", "context": "A useful context sentence about caching."}
+    )
+    assert result is not None
+    assert result["title"]
+    assert len(result["title"]) <= 80
+
+
+def test_normalize_default_domain_general() -> None:
+    result = _service()._normalize_result({"title": "t"})
+    assert result is not None
+    assert result["domain"] == "general"
+
+
+def test_normalize_non_dict_returns_none() -> None:
+    assert _service()._normalize_result(["not", "a", "dict"]) is None
+    assert _service()._normalize_result("string") is None
+    assert _service()._normalize_result(None) is None
