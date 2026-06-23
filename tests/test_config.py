@@ -138,3 +138,44 @@ def test_embedding_provider_env_overrides_config(tmp_path: Path, monkeypatch) ->
     config = load_config(config_file)
 
     assert config.embedding.provider == EmbeddingProvider.LOCAL
+
+
+def test_embedding_api_env_overrides_config(tmp_path: Path, monkeypatch) -> None:
+    config_file = tmp_path / "config.yaml"
+    config_file.write_text(
+        """
+embedding:
+  provider: none
+  local_model_path: config-local-model
+  api_key: config-key
+  api_base_url: https://config.example/v1
+  api_model: config-model
+  api_timeout: 3.0
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("EMBEDDING_PROVIDER", "api")
+    monkeypatch.setenv("EMBEDDING_LOCAL_MODEL_PATH", "env-local-model")
+    monkeypatch.setenv("EMBEDDING_API_KEY", "env-key")
+    monkeypatch.setenv("EMBEDDING_API_BASE_URL", "https://env.example/v1")
+    monkeypatch.setenv("EMBEDDING_API_MODEL", "env-model")
+    monkeypatch.setenv("EMBEDDING_API_TIMEOUT", "9.5")
+
+    config = load_config(config_file)
+
+    assert config.embedding.provider == EmbeddingProvider.API
+    assert config.embedding.local_model_path == "env-local-model"
+    assert config.embedding.api_key == "env-key"
+    assert config.embedding.api_base_url == "https://env.example/v1"
+    assert config.embedding.api_model == "env-model"
+    assert config.embedding.api_timeout == 9.5
+
+
+def test_embedding_api_env_invalid_timeout_keeps_config(tmp_path: Path, monkeypatch) -> None:
+    config_file = tmp_path / "config.yaml"
+    config_file.write_text("embedding:\n  api_timeout: 3.0\n", encoding="utf-8")
+    monkeypatch.setenv("EMBEDDING_API_TIMEOUT", "not-a-number")
+
+    config = load_config(config_file)
+
+    assert config.embedding.api_timeout == 3.0

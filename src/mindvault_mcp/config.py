@@ -42,6 +42,11 @@ class ExtractionConfig(BaseModel):
 
 class EmbeddingConfig(BaseModel):
     provider: EmbeddingProvider = EmbeddingProvider.NONE
+    local_model_path: str = "sentence-transformers/all-MiniLM-L6-v2"
+    api_key: str = ""
+    api_base_url: str = ""
+    api_model: str = ""
+    api_timeout: float = Field(default=10.0, gt=0.0)
 
 
 class DefaultsConfig(BaseModel):
@@ -125,6 +130,31 @@ def _apply_env_overrides(config: AppConfig) -> AppConfig:
 
     if "EMBEDDING_PROVIDER" in os.environ:
         embedding.provider = EmbeddingProvider(os.environ["EMBEDDING_PROVIDER"])
+
+    if "EMBEDDING_LOCAL_MODEL_PATH" in os.environ:
+        embedding.local_model_path = os.environ["EMBEDDING_LOCAL_MODEL_PATH"]
+
+    if "EMBEDDING_API_KEY" in os.environ:
+        embedding.api_key = os.environ["EMBEDDING_API_KEY"]
+
+    if "EMBEDDING_API_BASE_URL" in os.environ:
+        embedding.api_base_url = os.environ["EMBEDDING_API_BASE_URL"]
+    elif "EMBEDDING_API_URL" in os.environ:
+        embedding.api_base_url = os.environ["EMBEDDING_API_URL"]
+
+    if "EMBEDDING_MODEL" in os.environ:
+        embedding.api_model = os.environ["EMBEDDING_MODEL"]
+    elif "EMBEDDING_API_MODEL" in os.environ:
+        embedding.api_model = os.environ["EMBEDDING_API_MODEL"]
+
+    embedding.api_timeout = _env_float(
+        "EMBEDDING_TIMEOUT_SECONDS",
+        embedding.api_timeout,
+    )
+    embedding.api_timeout = _env_float(
+        "EMBEDDING_API_TIMEOUT",
+        embedding.api_timeout,
+    )
 
     return config
 

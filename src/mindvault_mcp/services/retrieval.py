@@ -28,7 +28,7 @@ class EmbeddingService:
     def embed_query(self, query: str | None) -> list[float]:
         if not query:
             return []
-        provider = create_provider(self.provider_type())
+        provider = create_provider(self.provider_type(), self.config)
         return provider.embed_text(query)
 
     def is_usable_vector(self, vector: list[float]) -> bool:
@@ -58,7 +58,7 @@ class EmbeddingService:
             cached_vector = cached["vector"]
             if self.is_usable_vector(cached_vector):
                 return cached_vector
-        provider = create_provider(provider_type)
+        provider = create_provider(provider_type, self.config)
         vector = provider.embed_text(searchable_text)
         if not self.is_usable_vector(vector):
             return []

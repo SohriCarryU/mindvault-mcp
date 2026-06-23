@@ -9,6 +9,7 @@ dist/
 build/
 *.egg-info/
 .env
+*.db
 data/*.sqlite
 data/*.sqlite-journal
 data/*.sqlite-wal

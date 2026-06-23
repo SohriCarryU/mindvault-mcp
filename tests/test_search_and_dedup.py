@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 from embedding_provider import APIProvider, LocalProvider
-from mindvault_mcp.config import AppConfig, DedupConfig
+from mindvault_mcp.config import AppConfig, DedupConfig, EmbeddingConfig
 from mindvault_mcp.enums import CardStatus, Library
 from mindvault_mcp.models import Card, utc_now
 from mindvault_mcp.tools import approve_card, ingest_memory, search_cards
@@ -247,3 +247,82 @@ def test_semantic_search_does_not_embed_unreadable_cards(runtime, monkeypatch) -
     assert [card.card_id for card in response.results["staging"]] == [visible.card_id]
     assert hidden.card_id not in [card.card_id for card in response.results["staging"]]
     assert hidden.searchable_text() not in embedded_texts
+
+
+def test_api_semantic_search_ranks_by_vector_similarity(runtime, monkeypatch) -> None:
+    def fake_embed_text(self: APIProvider, text: str) -> list[float]:
+        if "semantic api intent" in text:
+            return [1.0, 0.0]
+        if "api close vector" in text:
+            return [0.9, 0.1]
+        if "api far vector" in text:
+            return [0.1, 0.9]
+        return [0.0, 0.0]
+
+    runtime.config.embedding = EmbeddingConfig(
+        provider="api",
+        api_base_url="https://example.com/v1",
+        api_model="text-embedding-test",
+    )
+    monkeypatch.setenv("EMBEDDING_PROVIDER", "api")
+    monkeypatch.setenv("EMBEDDING_API_KEY", "test-key")
+    monkeypatch.setattr(APIProvider, "embed_text", fake_embed_text)
+    far = Card(title="API far card", problem="api far vector", confidence=0.9)
+    close = Card(title="API close card", problem="api close vector", confidence=0.1)
+    runtime.repository.save(far)
+    runtime.repository.save(close)
+
+    response = search_cards(runtime, "trusted-token", query="semantic api intent", library="staging")
+
+    assert response.message == "Search completed with semantic vector ranking."
+    assert [card.card_id for card in response.results["staging"]] == [close.card_id, far.card_id]
+
+
+def test_api_semantic_search_falls_back_to_keyword_when_vector_empty(runtime, monkeypatch) -> None:
+    def fake_embed_text(self: APIProvider, text: str) -> list[float]:
+        return []
+
+    runtime.config.embedding = EmbeddingConfig(
+        provider="api",
+        api_base_url="https://example.com/v1",
+        api_model="text-embedding-test",
+    )
+    monkeypatch.setenv("EMBEDDING_PROVIDER", "api")
+    monkeypatch.setenv("EMBEDDING_API_KEY", "test-key")
+    monkeypatch.setattr(APIProvider, "embed_text", fake_embed_text)
+    card = Card(title="API empty vector search", problem="keyword remains searchable")
+    runtime.repository.save(card)
+
+    response = search_cards(runtime, "trusted-token", query="keyword", library="staging")
+
+    assert response.message == "Search completed without vector embeddings."
+    assert [found.card_id for found in response.results["staging"]] == [card.card_id]
+
+
+def test_semantic_search_reuses_cached_api_card_vector(runtime, monkeypatch) -> None:
+    embedded_texts: list[str] = []
+
+    def fake_embed_text(self: APIProvider, text: str) -> list[float]:
+        embedded_texts.append(text)
+        if "semantic api intent" in text:
+            return [1.0, 0.0]
+        if "cached api vector" in text:
+            return [0.9, 0.1]
+        return [0.0, 0.0]
+
+    runtime.config.embedding = EmbeddingConfig(
+        provider="api",
+        api_base_url="https://example.com/v1",
+        api_model="text-embedding-test",
+    )
+    monkeypatch.setenv("EMBEDDING_PROVIDER", "api")
+    monkeypatch.setenv("EMBEDDING_API_KEY", "test-key")
+    monkeypatch.setattr(APIProvider, "embed_text", fake_embed_text)
+    card = Card(title="Cached API card", problem="cached api vector")
+    runtime.repository.save(card)
+
+    search_cards(runtime, "trusted-token", query="semantic api intent", library="staging")
+    search_cards(runtime, "trusted-token", query="semantic api intent", library="staging")
+
+    assert embedded_texts.count("semantic api intent") == 2
+    assert embedded_texts.count(card.searchable_text()) == 1
