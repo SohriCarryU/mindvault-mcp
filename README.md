@@ -6,7 +6,7 @@ The project is aimed at Hermes, OpenClaw, and other non-programming agent workfl
 
 ## Current Phase
 
-This repository includes Phase 8-A vector cache semantic ranking, Phase 7 optional LLM extraction, and Phase 6-C external validation persistence around the phase 2 MVP:
+This repository includes Phase 8-B real embedding provider boundaries, Phase 8-A vector cache semantic ranking, Phase 7 optional LLM extraction, and Phase 6-C external validation persistence around the phase 2 MVP:
 
 - Python 3.11 package structure
 - HTTP/SSE MCP server entrypoint using FastMCP
@@ -22,7 +22,7 @@ This repository includes Phase 8-A vector cache semantic ranking, Phase 7 option
 - Persistent verification queue placeholder with expiration status handling
 - Minimal URL link validation behind an opt-in external validation flag, with persisted results and conservative card status mapping
 - Basic duplicate detection using normalized title, tags, and domain similarity
-- Embedding provider abstraction with no-op, local placeholder, API placeholder, and cached vector ranking when usable vectors are available
+- Embedding provider abstraction with no-op, local `sentence-transformers`, opt-in API, and cached vector ranking when usable vectors are available
 - Eight MCP tools with runnable behavior
 - Pytest coverage for core storage, tools, extraction, verification queue, search, and deduplication
 
@@ -32,7 +32,6 @@ Out of scope for the current release:
 - External search APIs
 - Fact/content verification beyond URL reachability checks
 - Provider-specific LLM adapters or local LLM APIs that are not OpenAI-compatible
-- Real embedding model/API calls
 - Complex schedulers
 - Full review workflow UI
 - Production authentication center
@@ -69,6 +68,12 @@ Install the package in editable mode with test dependencies:
 
 ```powershell
 pip install -e ".[dev]"
+```
+
+The `local` embedding provider uses `sentence-transformers`; install it before enabling `EMBEDDING_PROVIDER=local`:
+
+```powershell
+pip install sentence-transformers
 ```
 
 Run the test suite:
@@ -139,7 +144,7 @@ External validation is disabled by default. When explicitly enabled, the current
 
 LLM extraction tests mock the API layer and do not make real network requests.
 
-Embedding tests use placeholder providers or monkeypatches and do not make real network requests.
+Embedding tests use monkeypatches and do not make real network requests or download real models.
 
 ## CI
 
@@ -305,15 +310,14 @@ Duplicate detection is basic and local. It compares normalized title, tags, and 
 Embedding providers are configured as:
 
 - `none`: implemented default; no vectors and no external calls
-- `local`: placeholder interface; returns fixed zero vectors and does not load a model
-- `api`: placeholder interface; returns fixed zero vectors and does not make network requests
+- `local`: loads a `sentence-transformers` model on this machine
+- `api`: calls an explicitly configured OpenAI-compatible embeddings endpoint
 
-Phase 8-A stores card vectors in SQLite as cache/index data, never in Markdown. The current placeholder providers return zero vectors by default, so normal local behavior still falls back to keyword search unless tests or future real providers supply usable vectors. See [Embedding Providers](docs/embedding-providers.md) for privacy boundaries and cache behavior.
+Phase 8-A stores card vectors in SQLite as cache/index data, never in Markdown. Phase 8-B keeps the default provider as `none`; `local` and `api` must be explicitly selected. API keys stay outside committed files, and unreadable cards are not embedded. See [Embedding Providers](docs/embedding-providers.md) for setup, privacy boundaries, and cache behavior.
 
 ## Roadmap
 
 - Rebuild SQLite index from Markdown
-- Replace placeholder embedding providers with real local/API implementations
 - Add richer candidate review lifecycle
 - Improve deduplication with semantic similarity when embedding support exists
 - Add import/export tooling for other agent memory systems
