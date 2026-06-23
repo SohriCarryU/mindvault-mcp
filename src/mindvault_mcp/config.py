@@ -47,6 +47,8 @@ class EmbeddingConfig(BaseModel):
     api_base_url: str = ""
     api_model: str = ""
     api_timeout: float = Field(default=10.0, gt=0.0)
+    candidate_multiplier: int = Field(default=5, ge=1)
+    candidate_max: int = Field(default=200, ge=1)
 
     def get_model_fingerprint(self, dimension: int) -> str:
         if self.provider == EmbeddingProvider.NONE:
@@ -125,6 +127,17 @@ def _env_float(key: str, fallback: float) -> float:
         return fallback
 
 
+def _env_int(key: str, fallback: int) -> int:
+    """Parse environment variable as int, fallback on parse error."""
+    value = os.getenv(key)
+    if value is None:
+        return fallback
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return fallback
+
+
 def _apply_env_overrides(config: AppConfig) -> AppConfig:
     """Apply environment variable overrides to config after pydantic validation."""
     ext = config.extraction
@@ -166,6 +179,15 @@ def _apply_env_overrides(config: AppConfig) -> AppConfig:
     embedding.api_timeout = _env_float(
         "EMBEDDING_API_TIMEOUT",
         embedding.api_timeout,
+    )
+
+    embedding.candidate_multiplier = max(
+        1,
+        _env_int("EMBEDDING_CANDIDATE_MULTIPLIER", embedding.candidate_multiplier),
+    )
+    embedding.candidate_max = max(
+        1,
+        _env_int("EMBEDDING_CANDIDATE_MAX", embedding.candidate_max),
     )
 
     return config

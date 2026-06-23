@@ -255,7 +255,7 @@ Inputs: `token`, optional `query`, `tags`, `domain`, `library`, `status`, `verif
 
 Searches by keyword and filters. Results are grouped by library, with `primary` searched before `staging`. Ranking is deterministic: library priority, confidence, updated time, then card id. Results are permission-filtered.
 
-If `EMBEDDING_PROVIDER` is set to `local` or `api` and the provider returns usable non-zero vectors, readable candidate cards can be ranked by cosine similarity using vectors cached in SQLite. Cached vectors include a provider/model/dimension fingerprint, so changing embedding provider or model invalidates stale cache rows before ranking. If vectors are unavailable, empty, zero, mismatched, or stale, search falls back to the existing keyword/filter logic or refreshes the cache when possible.
+If `EMBEDDING_PROVIDER` is set to `local` or `api` and the provider returns usable non-zero vectors, readable candidate cards can be ranked by cosine similarity using vectors cached in SQLite. Cached vectors include a provider/model/dimension fingerprint, so changing embedding provider or model invalidates stale cache rows before ranking. Semantic candidate recall is configurable via `candidate_multiplier`/`candidate_max` (and the `EMBEDDING_CANDIDATE_MULTIPLIER`/`EMBEDDING_CANDIDATE_MAX` env overrides); similarity scores stay in internal logs and are never added to the response. If vectors are unavailable, empty, zero, mismatched, or stale, search falls back to the existing keyword/filter logic or refreshes the cache when possible.
 
 ### `list_candidates`
 

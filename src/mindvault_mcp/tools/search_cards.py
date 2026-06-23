@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 from collections import defaultdict
 
 from mindvault_mcp.enums import Library
 from mindvault_mcp.schemas import SearchResponse
 
 from .common import ToolRuntime
+
+logger = logging.getLogger(__name__)
 
 
 def search_cards(
@@ -31,7 +34,7 @@ def search_cards(
         except PermissionError:
             continue
         if query and runtime.embeddings.is_usable_vector(query_vector):
-            candidate_limit = max(limit + offset, 100)
+            candidate_limit = runtime.embeddings.compute_candidate_limit(limit, offset)
             candidates = runtime.repository.search(
                 query=None,
                 tags=tags,
@@ -49,7 +52,18 @@ def search_cards(
                 except PermissionError:
                     continue
                 readable_candidates.append(card)
-            ranked_cards = runtime.embeddings.rank_cards(runtime.repository, query_vector, readable_candidates)
+            ranked_scored = runtime.embeddings.rank_cards_with_scores(
+                runtime.repository, query_vector, readable_candidates
+            )
+            ranked_cards = [card for _, card in ranked_scored]
+            logger.debug(
+                "search_cards scope=%s candidate_limit=%d candidates=%d semantic_hits=%d ranking=%s",
+                str(scope),
+                candidate_limit,
+                len(readable_candidates),
+                len(ranked_cards),
+                "semantic" if ranked_cards else "keyword_fallback",
+            )
             if ranked_cards:
                 results[str(scope)].extend(ranked_cards[offset : offset + limit])
                 used_semantic_ranking = True

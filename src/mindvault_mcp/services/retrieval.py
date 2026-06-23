@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import math
 import os
 from typing import TYPE_CHECKING
@@ -14,6 +15,8 @@ from mindvault_mcp.models import Card
 if TYPE_CHECKING:
     from mindvault_mcp.storage import CardRepository
 
+logger = logging.getLogger(__name__)
+
 
 class EmbeddingProviderUnavailable(RuntimeError):
     pass
@@ -23,6 +26,19 @@ class EmbeddingService:
     def __init__(self, config: AppConfig):
         self.config = config
         self._current_fingerprint_template = self.current_model_fingerprint(384)
+
+    def compute_candidate_limit(self, limit: int, offset: int) -> int:
+        """Compute candidate limit for semantic recall using configured multiplier and max."""
+        try:
+            multiplier = max(1, int(os.getenv("EMBEDDING_CANDIDATE_MULTIPLIER", self.config.embedding.candidate_multiplier)))
+        except (ValueError, TypeError):
+            multiplier = self.config.embedding.candidate_multiplier
+        try:
+            max_candidates = max(1, int(os.getenv("EMBEDDING_CANDIDATE_MAX", self.config.embedding.candidate_max)))
+        except (ValueError, TypeError):
+            max_candidates = self.config.embedding.candidate_max
+        desired = (limit + offset) * multiplier
+        return max(min(desired, max_candidates), limit + offset)
 
     def provider_type(self) -> str:
         return os.getenv("EMBEDDING_PROVIDER", str(self.config.embedding.provider))
@@ -87,12 +103,13 @@ class EmbeddingService:
         )
         return vector
 
-    def rank_cards(
+    def rank_cards_with_scores(
         self,
         repository: CardRepository,
         query_vector: list[float],
         cards: list[Card],
-    ) -> list[Card]:
+    ) -> list[tuple[float, Card]]:
+        """Rank cards by cosine similarity, returning (score, card) tuples in descending order."""
         if not self.is_usable_vector(query_vector):
             return []
         scored: list[tuple[float, Card]] = []
@@ -109,4 +126,18 @@ class EmbeddingService:
                 item[1].card_id,
             )
         )
-        return [card for _, card in scored]
+        logger.debug(
+            "Semantic ranking: %d candidates, %d scored, top score=%s",
+            len(cards),
+            len(scored),
+            f"{scored[0][0]:.4f}" if scored else "n/a",
+        )
+        return scored
+
+    def rank_cards(
+        self,
+        repository: CardRepository,
+        query_vector: list[float],
+        cards: list[Card],
+    ) -> list[Card]:
+        return [card for _, card in self.rank_cards_with_scores(repository, query_vector, cards)]

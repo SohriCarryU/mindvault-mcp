@@ -82,6 +82,29 @@ Examples:
 
 When the configured provider, model identifier, or actual vector dimension changes, MindVault treats the cached row as stale and re-embeds the card before ranking. Existing cache rows created before fingerprints are treated as stale because their fingerprint is empty. The cache remains SQLite-only index data; Markdown cards are not modified by vector cache refreshes.
 
+## Recall Strategy
+
+Semantic search first pulls a wider candidate set from SQLite, then ranks those candidates by cosine similarity. The candidate set size is configurable.
+
+```yaml
+embedding:
+  candidate_multiplier: 5
+  candidate_max: 200
+```
+
+The candidate limit is computed as:
+
+```text
+desired = (limit + offset) * candidate_multiplier
+candidate_limit = max(min(desired, candidate_max), limit + offset)
+```
+
+- `candidate_multiplier` (default `5`, minimum `1`) widens recall relative to the requested page window.
+- `candidate_max` (default `200`, minimum `1`) caps the multiplied candidate expansion; the result never falls below `limit + offset`.
+- Environment overrides `EMBEDDING_CANDIDATE_MULTIPLIER` and `EMBEDDING_CANDIDATE_MAX` take precedence; invalid values fall back to config.
+
+Candidate counts, semantic hit counts, and top similarity scores are written only to internal `logging` (`logger.debug`). Similarity scores are never included in the MCP `SearchResponse`.
+
 ## Privacy Boundary
 
 - `none` does not create vectors and does not send text anywhere.
