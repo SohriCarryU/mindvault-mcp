@@ -125,10 +125,14 @@ class APIProvider(EmbeddingProvider):
         if not self._has_config():
             return [[] for _ in texts]
 
+        # Many OpenAI-compatible gateways only accept a string "input" and reset the
+        # connection on an array. Send a string for single-text requests; keep the
+        # array form for true batches (supported by the official API).
+        input_value = texts[0] if len(texts) == 1 else texts
         payload = json.dumps(
             {
                 "model": self.model,
-                "input": texts,
+                "input": input_value,
                 "encoding_format": "float",
             }
         ).encode("utf-8")

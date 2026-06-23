@@ -97,7 +97,7 @@ def test_api_provider_real(monkeypatch: pytest.MonkeyPatch) -> None:
     assert captured["timeout"] == 7.5
     assert captured["authorization"] == "Bearer secret-token"
     assert captured["body"]["model"] == "text-embedding-test"
-    assert captured["body"]["input"] == ["real semantic text"]
+    assert captured["body"]["input"] == "real semantic text"
     assert captured["body"]["encoding_format"] == "float"
 
 
@@ -211,3 +211,53 @@ def test_api_provider_sends_user_agent(monkeypatch: pytest.MonkeyPatch) -> None:
 
     ua = captured["headers"].get("User-agent") or captured["headers"].get("User-Agent")
     assert ua == "mindvault-mcp"
+
+
+def test_api_provider_single_text_sends_string_input(monkeypatch: pytest.MonkeyPatch) -> None:
+    """APIProvider should send input as a string (not array) for single-text requests."""
+    import io
+    import json
+    captured: dict[str, object] = {}
+
+    def fake_urlopen(request, timeout=None):
+        captured["request_data"] = request.data
+        response_data = json.dumps({
+            "data": [{"embedding": [0.1, 0.2]}]
+        }).encode("utf-8")
+        return io.BytesIO(response_data)
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+
+    from embedding_provider import APIProvider
+
+    provider = APIProvider(api_key="test", base_url="https://test.com", model="test")
+    provider.embed_text("single text")
+
+    payload = json.loads(captured["request_data"])
+    assert isinstance(payload["input"], str)
+    assert payload["input"] == "single text"
+
+
+def test_api_provider_batch_sends_array_input(monkeypatch: pytest.MonkeyPatch) -> None:
+    """APIProvider should send input as an array for multi-text batch requests."""
+    import io
+    import json
+    captured: dict[str, object] = {}
+
+    def fake_urlopen(request, timeout=None):
+        captured["request_data"] = request.data
+        response_data = json.dumps({
+            "data": [{"embedding": [0.1, 0.2]}, {"embedding": [0.3, 0.4]}]
+        }).encode("utf-8")
+        return io.BytesIO(response_data)
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+
+    from embedding_provider import APIProvider
+
+    provider = APIProvider(api_key="test", base_url="https://test.com", model="test")
+    provider.embed_batch(["text one", "text two"])
+
+    payload = json.loads(captured["request_data"])
+    assert isinstance(payload["input"], list)
+    assert payload["input"] == ["text one", "text two"]
