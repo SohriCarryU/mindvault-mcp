@@ -132,12 +132,14 @@ class APIProvider(EmbeddingProvider):
                 "encoding_format": "float",
             }
         ).encode("utf-8")
+        user_agent = os.getenv("HTTP_USER_AGENT", "mindvault-mcp")
         request = urllib.request.Request(
             self._embedding_endpoint(),
             data=payload,
             headers={
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {self.api_key}",
+                "User-Agent": user_agent,
             },
             method="POST",
         )

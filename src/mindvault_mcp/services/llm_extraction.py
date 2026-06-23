@@ -59,12 +59,14 @@ class LLMExtractionService:
             }
         ).encode("utf-8")
 
+        user_agent = os.getenv("HTTP_USER_AGENT", "mindvault-mcp")
         request = urllib.request.Request(
             url,
             data=payload,
             headers={
-                "Content-type": "application/json",
+                "Content-Type": "application/json",
                 "Authorization": f"Bearer {key}",
+                "User-Agent": user_agent,
             },
             method="POST",
         )

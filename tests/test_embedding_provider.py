@@ -187,3 +187,27 @@ def test_api_provider_reads_key_from_env(monkeypatch: pytest.MonkeyPatch) -> Non
 
     assert vector == [0.5]
     assert captured["authorization"] == "Bearer env-secret"
+
+
+def test_api_provider_sends_user_agent(monkeypatch: pytest.MonkeyPatch) -> None:
+    """APIProvider should include User-Agent in request headers."""
+    import io
+    import json
+    captured: dict[str, object] = {}
+
+    def fake_urlopen(request, timeout=None):
+        captured["headers"] = dict(request.headers)
+        response_data = json.dumps({
+            "data": [{"embedding": [0.1, 0.2, 0.3]}]
+        }).encode("utf-8")
+        return io.BytesIO(response_data)
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+
+    from embedding_provider import APIProvider
+
+    provider = APIProvider(api_key="test", base_url="https://test.com", model="test")
+    provider.embed_text("hello")
+
+    ua = captured["headers"].get("User-agent") or captured["headers"].get("User-Agent")
+    assert ua == "mindvault-mcp"

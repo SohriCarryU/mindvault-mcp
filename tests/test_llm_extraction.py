@@ -413,3 +413,32 @@ def test_ingest_memory_with_llm_enabled_uses_llm_title(monkeypatch, tmp_path) ->
 
     assert response.ok is True
     assert response.card.title == "LLM integration title"
+
+
+def test_llm_extraction_sends_user_agent(monkeypatch: pytest.MonkeyPatch) -> None:
+    """LLM extraction should include User-Agent in request headers."""
+    import io
+    import json
+    import os
+    captured: dict[str, object] = {}
+
+    def fake_urlopen(request, timeout=None):
+        captured["headers"] = dict(request.headers)
+        response_data = json.dumps({
+            "choices": [{"message": {"content": '{"title":"test","problem":"","context":"","insight":"","solution":"","tags":[],"domain":"general","confidence":0.5}'}}]
+        }).encode("utf-8")
+        return io.BytesIO(response_data)
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+
+    from mindvault_mcp.config import AppConfig, ExtractionConfig
+    from mindvault_mcp.services.llm_extraction import LLMExtractionService
+
+    config = AppConfig(extraction=ExtractionConfig(llm_enabled=True))
+    service = LLMExtractionService(config)
+
+    os.environ["LLM_API_KEY"] = "test-key"
+    service.extract_via_llm("test text")
+
+    ua = captured["headers"].get("User-agent") or captured["headers"].get("User-Agent")
+    assert ua == "mindvault-mcp"
