@@ -34,6 +34,7 @@ def test_sqlite_index_upserts_and_reads_card_embedding(tmp_path: Path) -> None:
         vector=[0.1, 0.2],
         searchable_text_hash="hash-1",
         updated_at="2026-01-01T00:00:00+00:00",
+        model_fingerprint="local:model:dim2",
     )
 
     stored = index.get_card_embedding("card-1", "local")
@@ -44,6 +45,7 @@ def test_sqlite_index_upserts_and_reads_card_embedding(tmp_path: Path) -> None:
         "dimension": 2,
         "vector": [0.1, 0.2],
         "searchable_text_hash": "hash-1",
+        "model_fingerprint": "local:model:dim2",
         "updated_at": "2026-01-01T00:00:00+00:00",
     }
 

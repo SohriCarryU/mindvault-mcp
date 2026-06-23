@@ -22,6 +22,7 @@ MindVault keeps embedding support optional. The default configuration is privacy
 - `api` can call OpenAI, Azure OpenAI, or compatible embeddings endpoints through standard-library `urllib`.
 - Search can load the configured provider and call `embed_text(query)` when a query is provided.
 - Phase 8-A adds a SQLite `card_embeddings` cache table for card vectors.
+- Phase 8-C1 records a model fingerprint with each cached vector so provider, model, or dimension changes do not reuse stale vectors.
 - When the query vector and cached/generated card vectors are usable non-zero vectors, `search_cards` can rank readable candidates by cosine similarity.
 - If vectors are empty, zero, mismatched, or unavailable, search falls back to the existing SQLite keyword and filter logic.
 - Automated tests use monkeypatches and do not make real network calls or download real models.
@@ -63,6 +64,24 @@ API provider:
 
 `EMBEDDING_API_BASE_URL` can be a version root such as `https://example.com/v1` or a full embeddings endpoint such as `https://example.com/v1/embeddings`. If it does not end in `/embeddings`, the provider appends that suffix. API keys must stay in environment variables or uncommitted local configuration.
 
+## Cache Invalidation
+
+Card vectors are cached in SQLite with the searchable text hash and a model fingerprint.
+
+Fingerprint format:
+
+```text
+{provider}:{model_id}:dim{dimension}
+```
+
+Examples:
+
+- `local:sentence-transformers/all-MiniLM-L6-v2:dim384`
+- `api:text-embedding-3-small:dim1536`
+- `none::dim0`
+
+When the configured provider, model identifier, or actual vector dimension changes, MindVault treats the cached row as stale and re-embeds the card before ranking. Existing cache rows created before fingerprints are treated as stale because their fingerprint is empty. The cache remains SQLite-only index data; Markdown cards are not modified by vector cache refreshes.
+
 ## Privacy Boundary
 
 - `none` does not create vectors and does not send text anywhere.
@@ -74,5 +93,4 @@ API provider:
 
 ## Future Work
 
-- Add vector cache invalidation policies beyond searchable text hashing.
 - Add production-grade semantic retrieval controls after real providers exist.

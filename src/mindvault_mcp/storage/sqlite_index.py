@@ -96,11 +96,13 @@ class SQLiteIndex:
                     dimension INTEGER NOT NULL,
                     vector_json TEXT NOT NULL,
                     searchable_text_hash TEXT NOT NULL,
+                    model_fingerprint TEXT NOT NULL DEFAULT '',
                     updated_at TEXT NOT NULL,
                     PRIMARY KEY(card_id, provider)
                 )
                 """
             )
+            self._ensure_column(conn, "card_embeddings", "model_fingerprint", "TEXT NOT NULL DEFAULT ''")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_card_embeddings_provider ON card_embeddings(provider)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_card_embeddings_card ON card_embeddings(card_id)")
 
@@ -300,25 +302,28 @@ class SQLiteIndex:
             for row in rows
         ]
 
-    def upsert_card_embedding(
+    def save_card_embedding(
         self,
         card_id: str,
         provider: str,
         vector: list[float],
         searchable_text_hash: str,
+        model_fingerprint: str,
         updated_at: str,
     ) -> None:
         with self.connect() as conn:
             conn.execute(
                 """
                 INSERT INTO card_embeddings (
-                    card_id, provider, dimension, vector_json, searchable_text_hash, updated_at
+                    card_id, provider, dimension, vector_json, searchable_text_hash,
+                    model_fingerprint, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(card_id, provider) DO UPDATE SET
                     dimension=excluded.dimension,
                     vector_json=excluded.vector_json,
                     searchable_text_hash=excluded.searchable_text_hash,
+                    model_fingerprint=excluded.model_fingerprint,
                     updated_at=excluded.updated_at
                 """,
                 (
@@ -327,15 +332,35 @@ class SQLiteIndex:
                     len(vector),
                     json.dumps(vector),
                     searchable_text_hash,
+                    model_fingerprint,
                     updated_at,
                 ),
             )
+
+    def upsert_card_embedding(
+        self,
+        card_id: str,
+        provider: str,
+        vector: list[float],
+        searchable_text_hash: str,
+        updated_at: str,
+        model_fingerprint: str = "",
+    ) -> None:
+        self.save_card_embedding(
+            card_id=card_id,
+            provider=provider,
+            vector=vector,
+            searchable_text_hash=searchable_text_hash,
+            model_fingerprint=model_fingerprint,
+            updated_at=updated_at,
+        )
 
     def get_card_embedding(self, card_id: str, provider: str) -> dict[str, object] | None:
         with self.connect() as conn:
             row = conn.execute(
                 """
-                SELECT card_id, provider, dimension, vector_json, searchable_text_hash, updated_at
+                SELECT card_id, provider, dimension, vector_json, searchable_text_hash,
+                       model_fingerprint, updated_at
                 FROM card_embeddings
                 WHERE card_id = ? AND provider = ?
                 """,
@@ -349,5 +374,6 @@ class SQLiteIndex:
             "dimension": row["dimension"],
             "vector": json.loads(row["vector_json"]),
             "searchable_text_hash": row["searchable_text_hash"],
+            "model_fingerprint": row["model_fingerprint"],
             "updated_at": row["updated_at"],
         }

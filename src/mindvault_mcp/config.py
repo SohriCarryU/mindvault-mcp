@@ -48,6 +48,15 @@ class EmbeddingConfig(BaseModel):
     api_model: str = ""
     api_timeout: float = Field(default=10.0, gt=0.0)
 
+    def get_model_fingerprint(self, dimension: int) -> str:
+        if self.provider == EmbeddingProvider.NONE:
+            return "none::dim0"
+        if self.provider == EmbeddingProvider.LOCAL:
+            return f"local:{self.local_model_path}:dim{dimension}"
+        if self.provider == EmbeddingProvider.API:
+            return f"api:{self.api_model}:dim{dimension}"
+        return f"{self.provider}::dim{dimension}"
+
 
 class DefaultsConfig(BaseModel):
     ingest_library: Library = Library.STAGING
@@ -78,6 +87,9 @@ class AppConfig(BaseModel):
     verification: VerificationConfig = Field(default_factory=VerificationConfig)
     dedup: DedupConfig = Field(default_factory=DedupConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
+
+    def get_model_fingerprint(self, dimension: int) -> str:
+        return self.embedding.get_model_fingerprint(dimension)
 
 
 def _resolve_paths(config: AppConfig, base_dir: Path) -> AppConfig:

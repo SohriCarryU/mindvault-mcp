@@ -6,7 +6,7 @@ The project is aimed at Hermes, OpenClaw, and other non-programming agent workfl
 
 ## Current Phase
 
-This repository includes Phase 8-B real embedding provider boundaries, Phase 8-A vector cache semantic ranking, Phase 7 optional LLM extraction, and Phase 6-C external validation persistence around the phase 2 MVP:
+This repository includes Phase 8-C1 embedding cache fingerprint validation, Phase 8-B real embedding provider boundaries, Phase 8-A vector cache semantic ranking, Phase 7 optional LLM extraction, and Phase 6-C external validation persistence around the phase 2 MVP:
 
 - Python 3.11 package structure
 - HTTP/SSE MCP server entrypoint using FastMCP
@@ -22,7 +22,7 @@ This repository includes Phase 8-B real embedding provider boundaries, Phase 8-A
 - Persistent verification queue placeholder with expiration status handling
 - Minimal URL link validation behind an opt-in external validation flag, with persisted results and conservative card status mapping
 - Basic duplicate detection using normalized title, tags, and domain similarity
-- Embedding provider abstraction with no-op, local `sentence-transformers`, opt-in API, and cached vector ranking when usable vectors are available
+- Embedding provider abstraction with no-op, local `sentence-transformers`, opt-in API, and fingerprint-validated cached vector ranking when usable vectors are available
 - Eight MCP tools with runnable behavior
 - Pytest coverage for core storage, tools, extraction, verification queue, search, and deduplication
 
@@ -255,7 +255,7 @@ Inputs: `token`, optional `query`, `tags`, `domain`, `library`, `status`, `verif
 
 Searches by keyword and filters. Results are grouped by library, with `primary` searched before `staging`. Ranking is deterministic: library priority, confidence, updated time, then card id. Results are permission-filtered.
 
-If `EMBEDDING_PROVIDER` is set to `local` or `api` and the provider returns usable non-zero vectors, readable candidate cards can be ranked by cosine similarity using vectors cached in SQLite. If vectors are unavailable, empty, zero, or mismatched, search falls back to the existing keyword/filter logic.
+If `EMBEDDING_PROVIDER` is set to `local` or `api` and the provider returns usable non-zero vectors, readable candidate cards can be ranked by cosine similarity using vectors cached in SQLite. Cached vectors include a provider/model/dimension fingerprint, so changing embedding provider or model invalidates stale cache rows before ranking. If vectors are unavailable, empty, zero, mismatched, or stale, search falls back to the existing keyword/filter logic or refreshes the cache when possible.
 
 ### `list_candidates`
 
@@ -313,7 +313,7 @@ Embedding providers are configured as:
 - `local`: loads a `sentence-transformers` model on this machine
 - `api`: calls an explicitly configured OpenAI-compatible embeddings endpoint
 
-Phase 8-A stores card vectors in SQLite as cache/index data, never in Markdown. Phase 8-B keeps the default provider as `none`; `local` and `api` must be explicitly selected. API keys stay outside committed files, and unreadable cards are not embedded. See [Embedding Providers](docs/embedding-providers.md) for setup, privacy boundaries, and cache behavior.
+Phase 8-A stores card vectors in SQLite as cache/index data, never in Markdown. Phase 8-B keeps the default provider as `none`; `local` and `api` must be explicitly selected. Phase 8-C1 invalidates cached vectors when provider, model, or vector dimension changes. API keys stay outside committed files, and unreadable cards are not embedded. See [Embedding Providers](docs/embedding-providers.md) for setup, privacy boundaries, and cache behavior.
 
 ## Roadmap
 
